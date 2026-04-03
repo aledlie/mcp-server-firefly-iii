@@ -3,7 +3,7 @@
  * Provides context, retry info, and suggestions
  */
 
-export class FireflyError extends Error {
+class FireflyError extends Error {
   constructor(code, message, context = {}) {
     super(message);
     this.name = 'FireflyError';
@@ -43,7 +43,7 @@ export class FireflyError extends Error {
 /**
  * Wrap API errors with context
  */
-export const wrapFireflyError = (error, context = {}) => {
+const wrapFireflyError = (error, context = {}) => {
   if (error.response) {
     const status = error.response.status;
     let code = 'API_ERROR';
@@ -101,7 +101,7 @@ export const wrapFireflyError = (error, context = {}) => {
  * Safe error response for Claude
  * Excludes sensitive data, includes guidance
  */
-export const formatErrorResponse = (error) => {
+const formatErrorResponse = (error) => {
   const fireflyError = error instanceof FireflyError
     ? error
     : wrapFireflyError(error);
@@ -146,8 +146,15 @@ function getRetryGuidance(code) {
 /**
  * Axios error interceptor
  */
-export const createErrorInterceptor = () => {
+const createErrorInterceptor = () => {
   return (error) => {
     throw wrapFireflyError(error);
   };
+};
+
+module.exports = {
+  FireflyError,
+  wrapFireflyError,
+  formatErrorResponse,
+  createErrorInterceptor,
 };

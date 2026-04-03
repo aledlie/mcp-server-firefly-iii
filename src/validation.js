@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+const { z } = require('zod');
+const { zodToJsonSchema } = require('zod-to-json-schema');
 
 /**
  * Enhanced validation layer with Zod + JSON Schema generation
@@ -12,7 +12,7 @@ export const schemas = {
   uuid: z.string().uuid('Invalid UUID').describe('UUID identifier'),
   iso8601: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'YYYY-MM-DD format').describe('ISO 8601 date'),
   iso8601DateTime: z.string().datetime().describe('ISO 8601 datetime'),
-  currency: z.string().length(3).toUpperCase().describe('3-letter currency code (e.g., USD)'),
+  currency: z.string().length(3).transform((val) => val.toUpperCase()).describe('3-letter currency code (e.g., USD)'),
   amount: z.number().describe('Monetary amount'),
   percentage: z.number().min(0).max(100).describe('Percentage 0-100'),
   url: z.string().url().optional().describe('Valid URL'),
@@ -108,4 +108,12 @@ export const validators = {
     amount: schemas.amount.describe('Budget limit amount'),
     start_date: schemas.iso8601.optional(),
   }),
+};
+
+module.exports = {
+  schemas,
+  createValidatedHandler,
+  toMCPSchema,
+  ValidationError,
+  validators,
 };

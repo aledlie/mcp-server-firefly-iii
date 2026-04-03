@@ -5,34 +5,48 @@
  * Features: Zod validation, structured errors, resource metadata, tool grouping
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import express from 'express';
-import { apiClient, FIREFLY_URL, FIREFLY_TOKEN, PORT } from './src/config.js';
-import { formatErrorResponse, wrapFireflyError } from './src/errors.js';
-import {
+const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
+const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
+const { SSEServerTransport } = require('@modelcontextprotocol/sdk/server/sse.js');
+const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
+const express = require('express');
+const { apiClient, FIREFLY_URL, FIREFLY_TOKEN, PORT } = require('./src/config.js');
+const {
+  formatErrorResponse,
+  wrapFireflyError,
+  FireflyError,
+  createErrorInterceptor,
+} = require('./src/errors.js');
+const {
   getResourceHint,
   estimateTokenCost,
   resolveDependencies,
   getToolCategory,
-} from './src/resource-metadata.js';
-import { toMCPSchema, ValidationError } from './src/validation.js';
+  resourceMetadata,
+  toolGroups,
+  getToolsByCategory,
+} = require('./src/resource-metadata.js');
+const {
+  toMCPSchema,
+  ValidationError,
+  schemas,
+  validators,
+  createValidatedHandler,
+} = require('./src/validation.js');
 
-// Import tool modules
-import coreTools from './src/tools/core.js';
-import accountsTools from './src/tools/accounts.js';
-import transactionsTools from './src/tools/transactions.js';
-import budgetsTools from './src/tools/budgets.js';
-import automationTools from './src/tools/automation.js';
-import systemTools from './src/tools/system.js';
-import insightsTools from './src/tools/insights.js';
-import metaTools from './src/tools/meta.js';
-import billsTools from './src/tools/bills.js';
-import groupsTools from './src/tools/groups.js';
-import recurringTools from './src/tools/recurring.js';
-import adminTools from './src/tools/admin.js';
+// Import tool modules (CommonJS)
+const coreTools = require('./src/tools/core.js');
+const accountsTools = require('./src/tools/accounts.js');
+const transactionsTools = require('./src/tools/transactions.js');
+const budgetsTools = require('./src/tools/budgets.js');
+const automationTools = require('./src/tools/automation.js');
+const systemTools = require('./src/tools/system.js');
+const insightsTools = require('./src/tools/insights.js');
+const metaTools = require('./src/tools/meta.js');
+const billsTools = require('./src/tools/bills.js');
+const groupsTools = require('./src/tools/groups.js');
+const recurringTools = require('./src/tools/recurring.js');
+const adminTools = require('./src/tools/admin.js');
 
 // Aggregate tools
 const toolModules = [
@@ -283,8 +297,8 @@ async function runServer() {
 }
 
 // Start server
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (require.main === module) {
   runServer().catch(console.error);
 }
 
-export { mcpServer, enrichedTools as TOOLS, apiClient };
+module.exports = { mcpServer, enrichedTools: enrichedTools, TOOLS: enrichedTools, apiClient };

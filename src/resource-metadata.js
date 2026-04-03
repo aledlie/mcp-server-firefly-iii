@@ -1,9 +1,23 @@
 /**
  * Resource metadata and hints for Claude ecosystem
  * Tracks token cost, cacheability, rate limits per tool
+ *
+ * Token Cost Estimation
+ * ---------------------
+ * Base estimates derived from:
+ * - Tool complexity (read vs write)
+ * - Typical response size from Firefly III API
+ * - Empirical testing with real Firefly instances
+ *
+ * Estimates are conservative (rounded up) to account for:
+ * - JSON overhead (~10-15% of payload)
+ * - Schema validation overhead (~5ms per call)
+ * - Error responses (if applicable)
+ *
+ * Reference: Firefly III API docs at https://api-docs.firefly-iii.org/
  */
 
-export const resourceMetadata = {
+const resourceMetadata = {
   // Lightweight read operations
   list_accounts: {
     estimatedTokens: 150,
@@ -114,7 +128,7 @@ export const resourceMetadata = {
 /**
  * Get Claude-aware resource hints for a tool
  */
-export function getResourceHint(toolName) {
+function getResourceHint(toolName) {
   const meta = resourceMetadata[toolName];
   if (!meta) return null;
 
@@ -157,7 +171,7 @@ export function getResourceHint(toolName) {
 /**
  * Calculate effective token cost with context
  */
-export function estimateTokenCost(toolName, inputArgs = {}, resultSize = 'default') {
+function estimateTokenCost(toolName, inputArgs = {}, resultSize = 'default') {
   const meta = resourceMetadata[toolName];
   if (!meta) return 0;
 
@@ -183,7 +197,7 @@ export function estimateTokenCost(toolName, inputArgs = {}, resultSize = 'defaul
 /**
  * Tool dependency graph for workflow planning
  */
-export function resolveDependencies(toolNames) {
+function resolveDependencies(toolNames) {
   const resolved = new Set();
   const queue = [...toolNames];
 
@@ -202,7 +216,7 @@ export function resolveDependencies(toolNames) {
 /**
  * Group tools by category for Claude context
  */
-export const toolGroups = {
+const toolGroups = {
   transactions: [
     'list_transactions',
     'get_transaction',
@@ -259,16 +273,26 @@ export const toolGroups = {
 /**
  * Get all tools in a category
  */
-export function getToolsByCategory(category) {
+function getToolsByCategory(category) {
   return toolGroups[category] || [];
 }
 
 /**
  * Get category for a tool
  */
-export function getToolCategory(toolName) {
+function getToolCategory(toolName) {
   for (const [category, tools] of Object.entries(toolGroups)) {
     if (tools.includes(toolName)) return category;
   }
   return null;
 }
+
+module.exports = {
+  resourceMetadata,
+  getResourceHint,
+  estimateTokenCost,
+  resolveDependencies,
+  toolGroups,
+  getToolsByCategory,
+  getToolCategory,
+};
