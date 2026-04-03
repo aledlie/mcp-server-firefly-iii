@@ -754,10 +754,12 @@ catch (error) {
 ```
 
 **Acceptance Criteria:**
-- [ ] Single `toMCPErrorResult` function in `src/errors.js`
-- [ ] Both `index.js` and `index.enhanced.js` use it
-- [ ] Error response shape is identical from both entry points
-- [ ] Response always valid `CallToolResult` per MCP spec
+- [x] Single `toMCPErrorResult` function in `src/errors.js`
+- [x] Both `index.js` and `index.enhanced.js` use it
+- [x] Error response shape is identical from both entry points
+- [x] Response always valid `CallToolResult` per MCP spec
+
+**Status: Done** — commit `7b345be`
 
 **Estimate:** 0.25 day
 
@@ -1059,7 +1061,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P0** | #17 | MCP ListTools Violates Spec | ✅ Done | 0.5d | Code Review |
 | **P0** | #18 | SSE Transport Connection Unsafe | ✅ Done | 0.5d | Code Review |
 | **P0** | #19 | Request Interceptor Logs in Prod | ✅ Done | 0.25d | Code Review |
-| **P0** | #20 | formatErrorResponse Not MCP-Compliant | ❌ Pending | 0.25d | Code Review |
+| **P0** | #20 | formatErrorResponse Not MCP-Compliant | ✅ Done | 0.25d | Code Review |
 | **P0** | #21 | String Interpolation in URLs | ❌ Pending | 0.5d | Code Review |
 | **P1** | #5 | Fabricated "66 Tools" Claim | ❌ Pending | 0.5d | Backlog |
 | **P1** | #6 | Unsubstantiated "Empirical Testing" | ❌ Pending | 0.25d | Backlog |
@@ -1073,7 +1075,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P2** | #10 | Automation Count (9 vs 10) | ❌ Pending | 0.1d | Backlog |
 | **P2** | #11 | Broken `test:enhanced` Script | ❌ Pending | 0.25d | Backlog |
 | **P2** | #12 | Uncatalogued Tools Silent Fail | ❌ Pending | 0.5d | Backlog |
-| **P2** | #26 | ValidationError instanceof Check | ⚠️ Minor | 0.1d | Code Review |
+| **P2** | #26 | ValidationError instanceof Check | ✅ Done | 0.1d | Code Review |
 | **P2** | #27 | Schema Default Keyword Not Enforced | ❌ Pending | 0.5d | Code Review |
 | **P2** | #28 | update_transaction Schema Incomplete | ❌ Pending | 0.25d | Code Review |
 | **P2** | #29 | No additionalProperties: false | ❌ Pending | 0.25d | Code Review |

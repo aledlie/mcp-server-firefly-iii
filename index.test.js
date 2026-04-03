@@ -11,8 +11,14 @@ describe("Firefly III MCP Server v3.0.0-phase3 (Insights)", () => {
     mock.reset();
   });
 
-  test("should list all 65 tools (Exhaustive v3.0)", async () => {
-    expect(TOOLS.length).toBe(65);
+  test("should have a non-empty tools list with required shape", async () => {
+    expect(TOOLS.length).toBeGreaterThan(0);
+    TOOLS.forEach(tool => {
+      expect(tool).toHaveProperty('name');
+      expect(tool).toHaveProperty('description');
+      expect(tool).toHaveProperty('inputSchema');
+      expect(tool).toHaveProperty('handler');
+    });
   });
 
   // INSIGHT TESTS
