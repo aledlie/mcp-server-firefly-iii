@@ -36,15 +36,22 @@ const {
 
 // Tool modules in src/tools/ are not yet implemented (Phase 2).
 // Load tools from the upstream index.js instead to allow the server to start.
+// WARNING: This requires('./index.js') triggers upstream server initialization (side-effect).
+// The upstream Server instance is created but not connected to a transport here.
 const { TOOLS: upstreamTools } = require('./index.js');
 const TOOLS = upstreamTools || [];
 
 /**
  * Enhance tool metadata with resource hints and validation
+ * Logs warning if tool metadata is not registered (Phase 2 coverage incomplete)
  */
 function enrichToolMetadata(tool) {
   const resourceHint = getResourceHint(tool.name);
   const category = getToolCategory(tool.name);
+
+  if (!resourceHint) {
+    console.warn(`[enrichToolMetadata] No metadata registered for tool: ${tool.name} (Phase 2 incomplete)`);
+  }
 
   return {
     ...tool,

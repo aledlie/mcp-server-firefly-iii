@@ -7,7 +7,7 @@
  * Base estimates derived from:
  * - Tool complexity (read vs write)
  * - Typical response size from Firefly III API
- * - Empirical testing with real Firefly instances
+ * - Estimated based on typical API response patterns (not empirically validated)
  *
  * Estimates are conservative (rounded up) to account for:
  * - JSON overhead (~10-15% of payload)
@@ -127,6 +127,7 @@ const resourceMetadata = {
 
 /**
  * Get Claude-aware resource hints for a tool
+ * Returns null if tool metadata is not registered (Phase 2 tools not yet covered).
  */
 function getResourceHint(toolName) {
   const meta = resourceMetadata[toolName];
@@ -252,8 +253,7 @@ const toolGroups = {
   analytics: [
     'get_net_worth_summary',
     'get_spending_summary',
-    'get_balance_trend_charts',
-    'get_category_spending',
+    'get_account_overview_chart',
   ],
   automation: [
     'list_rules',
@@ -262,7 +262,7 @@ const toolGroups = {
     'update_rule',
     'delete_rule',
     'list_rule_groups',
-    'run_rule_group',
+    'trigger_rule_group',
     'list_webhooks',
     'create_webhook',
     'delete_webhook',

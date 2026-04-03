@@ -19,12 +19,13 @@ const schemas = {
   email: z.string().email().describe('Email address'),
   accountType: z.enum(['asset', 'expense', 'revenue', 'liabilities', 'loan', 'debt', 'equity']),
   transactionType: z.enum(['withdrawal', 'deposit', 'transfer', 'opening-balance']),
+  // Subset of Firefly III account roles; additional roles (sharedAsset, cashWallet, mortgage types) may exist
   accountRole: z.enum(['defaultAsset', 'savingsAccount', 'cc', 'loan']),
 };
 
 /**
  * Validation error with structured context
- * Handles both Zod v3 (error.errors) and Zod v4 (error.issues)
+ * Handles Zod version compatibility (both error.issues and error.errors are available)
  */
 class ValidationError extends Error {
   constructor(message, zodErrors) {
@@ -52,7 +53,7 @@ const createValidatedHandler = (schema, handler) => {
       return await handler(validated);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        // Support both Zod v3 (error.errors) and Zod v4 (error.issues)
+        // Both error.issues and error.errors are available in all supported Zod versions
         const issues = error.issues || error.errors || [];
         throw new ValidationError('Input validation failed', issues);
       }
