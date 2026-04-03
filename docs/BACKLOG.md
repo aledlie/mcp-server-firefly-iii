@@ -578,10 +578,12 @@ Either:
 **Recommendation:** Option A — these files have fixes applied (Zod v4 compat, topological sort). Commit them.
 
 **Acceptance Criteria:**
-- [ ] `src/validation.js` exists and exports all required symbols
-- [ ] `src/resource-metadata.js` exists and exports all required symbols
-- [ ] `npm run start:enhanced` starts without MODULE_NOT_FOUND
-- [ ] File sizes: validation.js > 100 lines, resource-metadata.js > 200 lines
+- [x] `src/validation.js` exists and exports all required symbols
+- [x] `src/resource-metadata.js` exists and exports all required symbols
+- [x] `npm run start:enhanced` starts without MODULE_NOT_FOUND
+- [x] File sizes: validation.js > 100 lines (124), resource-metadata.js > 200 lines (304)
+
+**Status: Done** — files exist and verified via `node -e "require(...)"`. Both export all required symbols. Server starts without MODULE_NOT_FOUND.
 
 **Estimate:** 0.5 day (commit existing files)
 
@@ -1047,7 +1049,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P0** | #3 | Mixed Module Syntax | ✅ Done | 0.25d | Backlog |
 | **P0** | #4 | `resolveDependencies()` Order Bug | ✅ Done | 0.5d | Backlog |
 | **P0** | #15 | Dual Server Instantiation | ✅ Done | 1d | Code Review |
-| **P0** | #16 | Missing Source Files (validation, metadata) | ⚠️ Partial | 0.5d | Code Review |
+| **P0** | #16 | Missing Source Files (validation, metadata) | ✅ Done | 0.5d | Code Review |
 | **P0** | #17 | MCP ListTools Violates Spec | ❌ Pending | 0.5d | Code Review |
 | **P0** | #18 | SSE Transport Connection Unsafe | ❌ Pending | 0.5d | Code Review |
 | **P0** | #19 | Request Interceptor Logs in Prod | ❌ Pending | 0.25d | Code Review |

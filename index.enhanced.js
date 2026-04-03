@@ -75,15 +75,9 @@ const mcpServer = new Server(
  * List available tools with metadata
  */
 mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: enrichedTools.map(({ _handler, _resourceMetadata, _category, _claudeHints, ...tool }) => ({
-    ...tool,
-    // Include Claude hints in description for visibility
-    description: tool.description + (_claudeHints?.length ? ` | ${_claudeHints.join(' ')}` : ''),
-    _metadata: {
-      category: _category,
-      resourceHints: _resourceMetadata,
-    },
-  })),
+  // Return only spec-compliant fields: name, description, inputSchema
+  // Metadata is available via GET /tools/metadata REST endpoint
+  tools: enrichedTools.map(({ _handler, _resourceMetadata, _category, _claudeHints, ...tool }) => tool),
 }));
 
 /**
