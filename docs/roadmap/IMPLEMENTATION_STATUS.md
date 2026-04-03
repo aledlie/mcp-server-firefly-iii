@@ -46,7 +46,7 @@ validators.budget
 - Type coercion (string → enum)
 - Reusable schema library
 
-**Quality:** Production-ready. Covers 95% of common input patterns.
+**Quality:** Covers common transaction, account, and budget input patterns; coverage percentage is not measured.
 
 ---
 
@@ -85,7 +85,7 @@ UNKNOWN_ERROR              other
   estimatedTokens: 500,
   cacheable: true,
   cacheMaxAge: 600,
-  rateLimit: { perMinute: 10 },
+  rateLimitHint: { perMinute: 10 },  // operator-configurable default, not an API constraint
   resultSize: 'medium',
   dependencies: ['list_accounts'],
   notes: '...'
