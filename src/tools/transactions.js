@@ -4,7 +4,7 @@ const transactionsTools = [
   {
     name: "list_transactions",
     description: "List recent transactions.",
-    inputSchema: { type: "object", properties: { limit: { type: "number", default: 10 } } },
+    inputSchema: { type: "object", properties: { limit: { type: "number", description: "Max results (default: 10)" } } },
     handler: async (args) => (await apiClient.get("/transactions", { params: { limit: args.limit || 10 } })).data
   },
   {
@@ -79,7 +79,17 @@ const transactionsTools = [
     description: "Update an existing transaction group.",
     inputSchema: {
       type: "object",
-      properties: { id: { type: "string" }, description: { type: "string" } },
+      properties: {
+        id: { type: "string", description: "Transaction group ID (required)" },
+        description: { type: "string" },
+        amount: { type: "number" },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        source_name: { type: "string" },
+        destination_name: { type: "string" },
+        category_name: { type: "string" },
+        tags: { type: "array", items: { type: "string" } },
+        notes: { type: "string" },
+      },
       required: ["id"]
     },
     handler: async (args) => {
@@ -101,7 +111,7 @@ const transactionsTools = [
     description: "Search for transactions.",
     inputSchema: {
       type: "object",
-      properties: { query: { type: "string" }, limit: { type: "number", default: 10 } },
+      properties: { query: { type: "string" }, limit: { type: "number", description: "Max results (default: 10)" } },
       required: ["query"]
     },
     handler: async (args) => (await apiClient.get("/search/transactions", { params: { query: args.query, limit: args.limit || 10 } })).data

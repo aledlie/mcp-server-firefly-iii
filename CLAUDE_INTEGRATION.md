@@ -12,7 +12,7 @@ Enhanced Firefly III MCP Server with native Claude support.
 
 **Usage:**
 ```javascript
-import { validators, createValidatedHandler } from './src/validation.js';
+const { validators, createValidatedHandler } = require('./src/validation.js');
 
 const handler = createValidatedHandler(validators.account, async (args) => {
   // args is guaranteed valid
@@ -194,8 +194,8 @@ mcp-server/
 
 ### For Custom Integrations
 ```javascript
-import { formatErrorResponse, wrapFireflyError } from './src/errors.js';
-import { getResourceHint, estimateTokenCost } from './src/resource-metadata.js';
+const { formatErrorResponse, wrapFireflyError } = require('./src/errors.js');
+const { getResourceHint, estimateTokenCost } = require('./src/resource-metadata.js');
 
 try {
   const result = await tool.handler(args);

@@ -1069,22 +1069,22 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P1** | #6 | Unsubstantiated "Empirical Testing" | ✅ Done | 0.25d | Backlog |
 | **P1** | #7 | Rate Limits Misframed as Constraints | ✅ Done | 0.5d | Backlog |
 | **P1** | #8 | Version Inconsistencies | ✅ Done | 0.25d | Backlog |
-| **P1** | #22 | Tool-Not-Found Throws Error | ❌ Pending | 0.25d | Code Review |
-| **P1** | #23 | upload_attachment Wrong API Pattern | ❌ Pending | 1d | Code Review |
+| **P1** | #22 | Tool-Not-Found Throws Error | ✅ Done | 0.25d | Code Review |
+| **P1** | #23 | upload_attachment Wrong API Pattern | ⏸ Deferred (design decision) | 1d | Code Review |
 | **P1** | #24 | CJS/ESM Documentation Mismatch | ❌ Pending | 0.5d | Code Review |
 | **P1** | #25 | Stale Tool Count Assertion | ✅ Done | 0.25d | Code Review |
 | **P2** | #9 | ESM Examples in Docs | ❌ Pending | 0.5d | Backlog |
 | **P2** | #10 | Automation Count (9 vs 10) | ✅ Done | 0.1d | Backlog |
-| **P2** | #11 | Broken `test:enhanced` Script | ❌ Pending | 0.25d | Backlog |
-| **P2** | #12 | Uncatalogued Tools Silent Fail | ❌ Pending | 0.5d | Backlog |
+| **P2** | #11 | Broken `test:enhanced` Script | ✅ Done | 0.25d | Backlog |
+| **P2** | #12 | Uncatalogued Tools Silent Fail | ✅ Done | 0.5d | Backlog |
 | **P2** | #26 | ValidationError instanceof Check | ✅ Done | 0.1d | Code Review |
 | **P2** | #27 | Schema Default Keyword Not Enforced | ❌ Pending | 0.5d | Code Review |
 | **P2** | #28 | update_transaction Schema Incomplete | ❌ Pending | 0.25d | Code Review |
-| **P2** | #29 | No additionalProperties: false | ❌ Pending | 0.25d | Code Review |
-| **P3** | #13 | `dotenv` Version Mismatch | ❌ Pending | 0.1d | Backlog |
-| **P3** | #14 | Sensitive Data Leak in Error | ❌ Pending | 0.1d | Backlog |
-| **P3** | #30 | Emoji in Startup Messages | ❌ Pending | 0.05d | Code Review |
-| **P3** | #31 | Debug Logging Always Enabled | ❌ Pending | 0.1d | Code Review |
+| **P2** | #29 | No additionalProperties: false | ⏸ Deferred | 0.25d | Code Review |
+| **P3** | #13 | `dotenv` Version Mismatch | ✅ Done (N/A) | 0.1d | Backlog |
+| **P3** | #14 | Sensitive Data Leak in Error | ✅ Done | 0.1d | Backlog |
+| **P3** | #30 | Emoji in Startup Messages | ✅ Done | 0.05d | Code Review |
+| **P3** | #31 | Debug Logging Always Enabled | ✅ Done | 0.1d | Code Review |
 
 **Summary:**
 - **P0 (Critical):** 11 issues (4 fixed, 7 pending) — Blocks functionality

@@ -9,7 +9,7 @@ const adminTools = [
       properties: {
         start: { type: "string" },
         end: { type: "string" },
-        type: { type: "string", enum: ["csv", "json"], default: "csv" }
+        type: { type: "string", enum: ["csv", "json"], description: "Export format (default: csv)" }
       },
       required: ["start", "end"]
     },

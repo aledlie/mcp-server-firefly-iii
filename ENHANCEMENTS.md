@@ -185,7 +185,7 @@ POST /api/{toolName}
 Define schema, wrap handler:
 
 ```javascript
-import { validators, createValidatedHandler } from './src/validation.js';
+const { validators, createValidatedHandler } = require('./src/validation.js');
 
 const handler = createValidatedHandler(
   validators.account.extend({
@@ -323,8 +323,8 @@ cp index.enhanced.js index.js  # or run alongside
 
 **Step 3:** Import from new modules
 ```javascript
-import { formatErrorResponse } from './src/errors.js';
-import { getResourceHint } from './src/resource-metadata.js';
+const { formatErrorResponse } = require('./src/errors.js');
+const { getResourceHint } = require('./src/resource-metadata.js');
 ```
 
 ### For New Projects
