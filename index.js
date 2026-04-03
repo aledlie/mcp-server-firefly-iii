@@ -8,7 +8,7 @@ const {
 } = require("@modelcontextprotocol/sdk/types.js");
 const express = require("express");
 const { FIREFLY_URL, FIREFLY_TOKEN, PORT, apiClient } = require("./src/config.js");
-const { toMCPErrorResult, wrapFireflyError } = require("./src/errors.js");
+const { FireflyError, toMCPErrorResult, wrapFireflyError } = require("./src/errors.js");
 
 // Import tool registry (no side effects — no Server instantiation)
 const { TOOLS } = require('./src/tools/registry.js');
@@ -26,17 +26,14 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const tool = TOOLS.find(t => t.name === request.params.name);
   if (!tool) {
-    return {
-      isError: true,
-      content: [{ type: "text", text: JSON.stringify({
-        isError: true,
-        code: "TOOL_NOT_FOUND",
-        message: `Tool not found: ${request.params.name}`,
-        availableTools: TOOLS.map(t => t.name),
-      }, null, 2) }],
-    };
+    const toolNotFoundError = new FireflyError(
+      "TOOL_NOT_FOUND",
+      `Tool not found: ${request.params.name}`,
+      { availableTools: TOOLS.map(t => t.name) }
+    );
+    return toMCPErrorResult(toolNotFoundError);
   }
-  
+
   try {
     const result = await tool.handler(request.params.arguments || {});
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
@@ -57,8 +54,17 @@ async function runServer() {
       const sessionId = req.query.sessionId || require("crypto").randomUUID();
       const transport = new SSEServerTransport(`/messages?sessionId=${sessionId}`, res);
       sessions.set(sessionId, transport);
-      res.on("close", () => sessions.delete(sessionId));
-      await mcpServer.connect(transport);
+
+      const cleanup = () => sessions.delete(sessionId);
+      res.on("close", cleanup);
+      res.on("error", cleanup);
+
+      try {
+        await mcpServer.connect(transport);
+      } catch (error) {
+        cleanup();
+        throw error;
+      }
     });
     app.post("/messages", async (req, res) => {
       const sessionId = req.query.sessionId;

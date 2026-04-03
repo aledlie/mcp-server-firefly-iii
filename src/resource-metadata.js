@@ -176,6 +176,9 @@ function getResourceHint(toolName) {
   };
 }
 
+// Track tools with missing metadata to warn only once per tool per session
+const warnedMissingMetadata = new Set();
+
 /**
  * Calculate effective token cost with context
  */
@@ -183,7 +186,11 @@ function estimateTokenCost(toolName, inputArgs = {}, resultSize = 'default') {
   const meta = resourceMetadata[toolName];
   if (!meta) {
     // Tool has no metadata entry — 54 of 66 tools are not yet catalogued (Phase 2)
-    console.warn(`[resource-metadata] No token estimate for tool: ${toolName} (returning 0)`);
+    // Warn only once per tool to avoid console spam on repeated calls
+    if (!warnedMissingMetadata.has(toolName)) {
+      console.warn(`[resource-metadata] No token estimate for tool: ${toolName} (Phase 2)`);
+      warnedMissingMetadata.add(toolName);
+    }
     return 0;
   }
 

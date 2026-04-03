@@ -156,8 +156,17 @@ async function runServer() {
       const sessionId = req.query.sessionId || require('crypto').randomUUID();
       const transport = new SSEServerTransport(`/messages?sessionId=${sessionId}`, res);
       sessions.set(sessionId, transport);
-      res.on('close', () => sessions.delete(sessionId));
-      await mcpServer.connect(transport);
+
+      const cleanup = () => sessions.delete(sessionId);
+      res.on('close', cleanup);
+      res.on('error', cleanup);
+
+      try {
+        await mcpServer.connect(transport);
+      } catch (error) {
+        cleanup();
+        throw error;
+      }
     });
 
     app.post('/messages', async (req, res) => {
