@@ -9,35 +9,8 @@ const {
 const express = require("express");
 const { FIREFLY_URL, FIREFLY_TOKEN, PORT, apiClient } = require("./src/config.js");
 
-// Import modular tools
-const coreTools = require("./src/tools/core.js");
-const accountsTools = require("./src/tools/accounts.js");
-const transactionsTools = require("./src/tools/transactions.js");
-const budgetsTools = require("./src/tools/budgets.js");
-const automationTools = require("./src/tools/automation.js");
-const systemTools = require("./src/tools/system.js");
-const insightsTools = require("./src/tools/insights.js");
-const metaTools = require("./src/tools/meta.js");
-const billsTools = require("./src/tools/bills.js");
-const groupsTools = require("./src/tools/groups.js");
-const recurringTools = require("./src/tools/recurring.js");
-const adminTools = require("./src/tools/admin.js");
-
-// Registry
-const TOOLS = [
-  ...coreTools,
-  ...accountsTools,
-  ...transactionsTools,
-  ...budgetsTools,
-  ...automationTools,
-  ...systemTools,
-  ...insightsTools,
-  ...metaTools,
-  ...billsTools,
-  ...groupsTools,
-  ...recurringTools,
-  ...adminTools
-];
+// Import tool registry (no side effects — no Server instantiation)
+const { TOOLS } = require('./src/tools/registry.js');
 
 // --- MCP Server Implementation ---
 const mcpServer = new Server(
