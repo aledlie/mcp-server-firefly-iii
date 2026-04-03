@@ -155,16 +155,26 @@ async function runServer() {
     const app = express();
     app.use(express.json());
 
-    let transport;
+    // Session-keyed transports — prevents connection overwrites when multiple clients connect
+    const sessions = new Map();
 
     // SSE support
     app.get('/sse', async (req, res) => {
-      transport = new SSEServerTransport('/messages', res);
+      const sessionId = req.query.sessionId || require('crypto').randomUUID();
+      const transport = new SSEServerTransport(`/messages?sessionId=${sessionId}`, res);
+      sessions.set(sessionId, transport);
+      res.on('close', () => sessions.delete(sessionId));
       await mcpServer.connect(transport);
     });
 
     app.post('/messages', async (req, res) => {
-      if (transport) await transport.handlePostMessage(req, res);
+      const sessionId = req.query.sessionId;
+      const transport = sessions.get(sessionId);
+      if (transport) {
+        await transport.handlePostMessage(req, res);
+      } else {
+        res.status(400).json({ error: 'Session not found' });
+      }
     });
 
     // REST API endpoints

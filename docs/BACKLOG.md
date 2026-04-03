@@ -617,10 +617,12 @@ The MCP spec for `ListToolsResult` does not include `_metadata`. Injecting custo
 - Store hints in a separate mapping or serve via REST only
 
 **Acceptance Criteria:**
-- [ ] `ListToolsResponse` contains only: `name`, `description`, `inputSchema` per spec
-- [ ] No custom `_metadata` field in response
-- [ ] Descriptions are original, unmodified
-- [ ] Metadata available via `/tools/metadata` REST endpoint only
+- [x] `ListToolsResponse` contains only: `name`, `description`, `inputSchema` per spec
+- [x] No custom `_metadata` field in response
+- [x] Descriptions are original, unmodified
+- [x] Metadata available via `/tools/metadata` REST endpoint only
+
+**Status: Done** — commit `19f8a81`
 
 **Estimate:** 0.5 day
 
@@ -1050,7 +1052,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P0** | #4 | `resolveDependencies()` Order Bug | ✅ Done | 0.5d | Backlog |
 | **P0** | #15 | Dual Server Instantiation | ✅ Done | 1d | Code Review |
 | **P0** | #16 | Missing Source Files (validation, metadata) | ✅ Done | 0.5d | Code Review |
-| **P0** | #17 | MCP ListTools Violates Spec | ❌ Pending | 0.5d | Code Review |
+| **P0** | #17 | MCP ListTools Violates Spec | ✅ Done | 0.5d | Code Review |
 | **P0** | #18 | SSE Transport Connection Unsafe | ❌ Pending | 0.5d | Code Review |
 | **P0** | #19 | Request Interceptor Logs in Prod | ❌ Pending | 0.25d | Code Review |
 | **P0** | #20 | formatErrorResponse Not MCP-Compliant | ❌ Pending | 0.25d | Code Review |
