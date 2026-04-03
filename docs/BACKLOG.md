@@ -2,7 +2,7 @@
 
 **Report Date:** 2026-04-03  
 **Source:** Hallucination-checker + GenAI Quality Monitor  
-**Status:** All items pending  
+**Status:** Phase 1 complete — see summary table below for per-item status  
 
 ---
 
@@ -1085,14 +1085,52 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P3** | #14 | Sensitive Data Leak in Error | ✅ Done | 0.1d | Backlog |
 | **P3** | #30 | Emoji in Startup Messages | ✅ Done | 0.05d | Code Review |
 | **P3** | #31 | Debug Logging Always Enabled | ✅ Done | 0.1d | Code Review |
+| **P2** | #32 | Analytics count wrong (4 vs 3) | ✅ Done | 0.05d | Hallucination Check |
+| **P2** | #33 | Version 3.1.0 in roadmap files | ✅ Done | 0.05d | Hallucination Check |
+| **P3** | #34 | Emojis in README_CLAUDE.md | ✅ Done | 0.05d | Hallucination Check |
 
 **Summary (Updated 2026-04-03):**
 - **P0 (Critical):** 11 issues — all Done
 - **P1 (High):** 9 issues — 8 Done, 1 Deferred (#23 — design decision)
-- **P2 (Medium):** 9 issues — 8 Done, 1 Deferred (#29 — Phase 2)
-- **P3 (Low):** 4 issues — all Done
+- **P2 (Medium):** 11 issues — 10 Done, 1 Deferred (#29 — Phase 2)
+- **P3 (Low):** 6 issues — all Done
 
-**Remaining:** 2 deferred items (#23 upload_attachment multipart, #29 additionalProperties)
+**Remaining:** 0 outstanding (2 items deferred by design decision: #23, #29)
+
+---
+
+## Post-Phase-1 Hallucination Check Findings (2026-04-03)
+
+### Issue #32: analytics tool count wrong in ENHANCEMENTS.md and IMPLEMENTATION_STATUS.md
+
+**Files:** `ENHANCEMENTS.md:134`, `docs/roadmap/IMPLEMENTATION_STATUS.md:116`  
+**Severity:** MEDIUM — Incorrect tool counts
+
+**Problem:** Both files stated "analytics — 4 tools" but `toolGroups.analytics` contains 3 entries.
+
+**Status: Done** — commit `77b2112` and `111c210`
+
+---
+
+### Issue #33: Version 3.1.0 in README_CLAUDE.md and roadmap files
+
+**Files:** `README_CLAUDE.md:196`, `docs/roadmap/IMPLEMENTATION_STATUS.md:4`, `docs/roadmap/README.md:50`  
+**Severity:** MEDIUM — Version inconsistency (issue #8 was partially fixed, missed these files)
+
+**Problem:** Issue #8 fix did not update README_CLAUDE.md, IMPLEMENTATION_STATUS.md, or roadmap README.md — all still referenced 3.1.0.
+
+**Status: Done** — commit `111c210`
+
+---
+
+### Issue #34: Emojis in README_CLAUDE.md feature list
+
+**Files:** `README_CLAUDE.md:6-10`  
+**Severity:** LOW — Violates CLAUDE.md no-emoji rule
+
+**Problem:** Feature list used emoji decorators (🛡️, 📍, 📊, 🎯, 🚀).
+
+**Status: Done** — commit `111c210`
 
 ---
 
