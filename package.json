@@ -3,12 +3,17 @@
   "version": "3.0.0",
   "description": "An MCP server for interacting with Firefly III personal finance manager",
   "main": "index.js",
+  "type": "module",
   "bin": {
-    "mcp-server-firefly-iii": "index.js"
+    "mcp-server-firefly-iii": "index.js",
+    "mcp-server-firefly-iii-enhanced": "index.enhanced.js"
   },
   "scripts": {
     "start": "node index.js",
-    "test": "jest"
+    "start:enhanced": "node index.enhanced.js",
+    "start:web": "PORT=3000 node index.enhanced.js",
+    "test": "jest",
+    "test:enhanced": "NODE_OPTIONS='--loader=./src/test-loader.js' jest"
   },
   "keywords": [
     "mcp",
@@ -23,7 +28,9 @@
     "@modelcontextprotocol/sdk": "^1.28.0",
     "axios": "^1.14.0",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "zod": "^4.3.6",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "axios-mock-adapter": "^2.1.0",
