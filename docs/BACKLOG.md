@@ -544,9 +544,11 @@ Result: two `Server` instances in same process, one is orphaned. If `index.enhan
 Extract only the tool registry from `index.js` into a dedicated `src/tools/registry.js` module that performs no side effects. Both entry points should import only tools, not the server.
 
 **Acceptance Criteria:**
-- [ ] No `Server` instantiation in `src/` modules
-- [ ] `index.js` and `index.enhanced.js` each create exactly one Server
-- [ ] No orphaned handlers or instances in process
+- [x] No `Server` instantiation in `src/` modules
+- [x] `index.js` and `index.enhanced.js` each create exactly one Server
+- [x] No orphaned handlers or instances in process
+
+**Status: Done** — commit `5ea614c` — `src/tools/registry.js` created; both index files import from it.
 
 **Estimate:** 1 day
 
@@ -1044,7 +1046,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P0** | #2 | Missing `src/tools/` Directory | ✅ Done (B) | 1–3d | Backlog |
 | **P0** | #3 | Mixed Module Syntax | ✅ Done | 0.25d | Backlog |
 | **P0** | #4 | `resolveDependencies()` Order Bug | ✅ Done | 0.5d | Backlog |
-| **P0** | #15 | Dual Server Instantiation | ❌ Pending | 1d | Code Review |
+| **P0** | #15 | Dual Server Instantiation | ✅ Done | 1d | Code Review |
 | **P0** | #16 | Missing Source Files (validation, metadata) | ⚠️ Partial | 0.5d | Code Review |
 | **P0** | #17 | MCP ListTools Violates Spec | ❌ Pending | 0.5d | Code Review |
 | **P0** | #18 | SSE Transport Connection Unsafe | ❌ Pending | 0.5d | Code Review |
