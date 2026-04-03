@@ -93,29 +93,31 @@ UNKNOWN_ERROR              other
 ```
 
 **Capabilities:**
-- 66 tools catalogued
-- Token cost estimation
+- 12 tools with full resourceMetadata entries (token estimates, cache hints, rate limit hints, dependency graph)
+- 66 total tools in the server; 38 organized into 6 categories in toolGroups
+- Metadata coverage: 12/66 tools (18%) — remaining tools return null from getResourceHint() and 0 from estimateTokenCost()
+- Token cost estimation (heuristic — not empirically measured)
 - Cacheability matrix
-- Rate limit tracking
-- Dependency graph
+- Rate limit hints (operator-configurable defaults, not enforced by Firefly III)
 - Tool categorization (6 categories)
 
-**Quality:** Production-ready. Covers all 66 tools with verified metadata.
+**Quality:** Partial metadata coverage. 12 core tools have verified entries; remaining 54 tools require Phase 2 metadata additions.
 
 ---
 
 #### 4. Tool Organization
 **Implementation:** `src/resource-metadata.js` + `index.enhanced.js`
 
-**Categories:**
+**Categories (toolGroups):**
 ```
 transactions    (7 tools)
 accounts        (5 tools)
 budgets         (8 tools)
 analytics       (4 tools)  ← expensive
-automation      (9 tools)
+automation      (10 tools)
 system          (5 tools)
 ```
+Note: 66 total tools; 38 are categorized in toolGroups above; remainder are uncategorized or in separate modules.
 
 **Functions:**
 - `getToolsByCategory()`

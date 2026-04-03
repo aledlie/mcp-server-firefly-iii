@@ -1,6 +1,13 @@
 /**
  * Resource metadata and hints for Claude ecosystem
- * Tracks token cost, cacheability, rate limits per tool
+ * Tracks token cost, cacheability, and rate limit hints per tool
+ *
+ * Rate Limit Hints (rateLimitHint)
+ * ---------------------------------
+ * Firefly III is self-hosted; rate limits depend on the operator's web server
+ * (nginx, Apache) and PHP-FPM configuration. These values are conservative
+ * recommended defaults — NOT enforced API constraints. Adjust per deployment.
+ * See https://docs.firefly-iii.org/ for deployment configuration guidance.
  *
  * Token Cost Estimation
  * ---------------------
@@ -23,7 +30,7 @@ const resourceMetadata = {
     estimatedTokens: 150,
     cacheable: true,
     cacheMaxAge: 300, // 5 min
-    rateLimit: { perMinute: 60 },
+    rateLimitHint: { perMinute: 60 },
     resultSize: 'small', // typical <5KB
     dependencies: [],
   },
@@ -31,7 +38,7 @@ const resourceMetadata = {
     estimatedTokens: 120,
     cacheable: true,
     cacheMaxAge: 300,
-    rateLimit: { perMinute: 60 },
+    rateLimitHint: { perMinute: 60 },
     resultSize: 'small',
     dependencies: [],
   },
@@ -39,7 +46,7 @@ const resourceMetadata = {
     estimatedTokens: 300,
     cacheable: 'conditional', // Cache varies by filter params
     cacheMaxAge: 60, // 1 min
-    rateLimit: { perMinute: 30 },
+    rateLimitHint: { perMinute: 30 },
     resultSize: 'medium', // 10-100KB
     dependencies: [],
     notes: 'Large result sets; consider pagination',
@@ -48,7 +55,7 @@ const resourceMetadata = {
     estimatedTokens: 200,
     cacheable: true,
     cacheMaxAge: 300,
-    rateLimit: { perMinute: 60 },
+    rateLimitHint: { perMinute: 60 },
     resultSize: 'small',
     dependencies: ['list_transactions'],
   },
@@ -57,7 +64,7 @@ const resourceMetadata = {
   create_transaction: {
     estimatedTokens: 400,
     cacheable: false,
-    rateLimit: { perMinute: 20 },
+    rateLimitHint: { perMinute: 20 },
     resultSize: 'small',
     dependencies: ['list_accounts'],
     notes: 'Mutates state. Requires source and destination accounts.',
@@ -65,14 +72,14 @@ const resourceMetadata = {
   update_transaction: {
     estimatedTokens: 300,
     cacheable: false,
-    rateLimit: { perMinute: 20 },
+    rateLimitHint: { perMinute: 20 },
     resultSize: 'small',
     dependencies: ['get_transaction'],
   },
   delete_transaction: {
     estimatedTokens: 150,
     cacheable: false,
-    rateLimit: { perMinute: 20 },
+    rateLimitHint: { perMinute: 20 },
     resultSize: 'minimal',
     dependencies: ['get_transaction'],
   },
@@ -82,14 +89,14 @@ const resourceMetadata = {
     estimatedTokens: 200,
     cacheable: true,
     cacheMaxAge: 300,
-    rateLimit: { perMinute: 40 },
+    rateLimitHint: { perMinute: 40 },
     resultSize: 'small',
     dependencies: [],
   },
   create_budget: {
     estimatedTokens: 300,
     cacheable: false,
-    rateLimit: { perMinute: 15 },
+    rateLimitHint: { perMinute: 15 },
     resultSize: 'small',
     dependencies: [],
   },
@@ -99,7 +106,7 @@ const resourceMetadata = {
     estimatedTokens: 500,
     cacheable: true,
     cacheMaxAge: 600, // 10 min; older data acceptable
-    rateLimit: { perMinute: 10 },
+    rateLimitHint: { perMinute: 10 },
     resultSize: 'medium',
     dependencies: ['list_accounts'],
     notes: 'Computation-heavy; avoid frequent calls',
@@ -108,7 +115,7 @@ const resourceMetadata = {
     estimatedTokens: 600,
     cacheable: 'conditional',
     cacheMaxAge: 300,
-    rateLimit: { perMinute: 10 },
+    rateLimitHint: { perMinute: 10 },
     resultSize: 'large', // Can be 100+ KB
     dependencies: ['list_transactions'],
     notes: 'Large result sets; may exceed token limits',
@@ -119,7 +126,7 @@ const resourceMetadata = {
     estimatedTokens: 100,
     cacheable: true,
     cacheMaxAge: 3600, // 1 hour
-    rateLimit: { perMinute: 100 },
+    rateLimitHint: { perMinute: 100 },
     resultSize: 'minimal',
     dependencies: [],
   },
@@ -148,8 +155,8 @@ function getResourceHint(toolName) {
   }
 
   // Rate limits
-  if (meta.rateLimit?.perMinute <= 15) {
-    hints.push(`🚦 Low rate limit (${meta.rateLimit.perMinute}/min)`);
+  if (meta.rateLimitHint?.perMinute <= 15) {
+    hints.push(`Rate limit hint: ${meta.rateLimitHint.perMinute}/min (operator-configurable)`);
   }
 
   // Result size warnings

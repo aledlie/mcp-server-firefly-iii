@@ -122,7 +122,7 @@ Retry codes: `RATE_LIMITED`, `TIMEOUT`, `NETWORK`, `TEMP_UNAVAILABLE`
 | accounts | 5 | 100–200 |
 | budgets | 8 | 100–400 |
 | **analytics** | 4 | **500–800** |
-| automation | 9 | 150–400 |
+| automation | 10 | 150–400 |
 | system | 5 | 100–200 |
 
 *Analytics tools are computation-heavy; use sparingly.*

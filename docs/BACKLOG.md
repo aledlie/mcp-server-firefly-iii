@@ -783,9 +783,11 @@ apiClient.get('/charts/account/overview', { params: { start: args.start, end: ar
 ```
 
 **Acceptance Criteria:**
-- [ ] All `apiClient.get/post/put/delete` calls use `{ params: {...} }` config
-- [ ] No string interpolation for query parameters
-- [ ] Test: passing date like `2024-01-01` is correctly encoded in URL
+- [x] All query parameter calls use `{ params: {...} }` config (insights.js fixed)
+- [x] No string interpolation for query parameters in insights.js
+- [x] Test: passing date `2023-01-01` verified via `mock.history.get[0].params` in index.test.js
+
+**Status: Done** — commit `a234826`
 
 **Estimate:** 0.5 day
 
@@ -1062,7 +1064,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P0** | #18 | SSE Transport Connection Unsafe | ✅ Done | 0.5d | Code Review |
 | **P0** | #19 | Request Interceptor Logs in Prod | ✅ Done | 0.25d | Code Review |
 | **P0** | #20 | formatErrorResponse Not MCP-Compliant | ✅ Done | 0.25d | Code Review |
-| **P0** | #21 | String Interpolation in URLs | ❌ Pending | 0.5d | Code Review |
+| **P0** | #21 | String Interpolation in URLs | ✅ Done | 0.5d | Code Review |
 | **P1** | #5 | Fabricated "66 Tools" Claim | ❌ Pending | 0.5d | Backlog |
 | **P1** | #6 | Unsubstantiated "Empirical Testing" | ❌ Pending | 0.25d | Backlog |
 | **P1** | #7 | Rate Limits Misframed as Constraints | ❌ Pending | 0.5d | Backlog |
@@ -1070,7 +1072,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P1** | #22 | Tool-Not-Found Throws Error | ❌ Pending | 0.25d | Code Review |
 | **P1** | #23 | upload_attachment Wrong API Pattern | ❌ Pending | 1d | Code Review |
 | **P1** | #24 | CJS/ESM Documentation Mismatch | ❌ Pending | 0.5d | Code Review |
-| **P1** | #25 | Stale Tool Count Assertion | ❌ Pending | 0.25d | Code Review |
+| **P1** | #25 | Stale Tool Count Assertion | ✅ Done | 0.25d | Code Review |
 | **P2** | #9 | ESM Examples in Docs | ❌ Pending | 0.5d | Backlog |
 | **P2** | #10 | Automation Count (9 vs 10) | ❌ Pending | 0.1d | Backlog |
 | **P2** | #11 | Broken `test:enhanced` Script | ❌ Pending | 0.25d | Backlog |

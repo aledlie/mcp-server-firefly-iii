@@ -132,7 +132,7 @@ getToolsByCategory('analytics');
 - `accounts` — 5 tools
 - `budgets` — 8 tools
 - `analytics` — 4 tools (expensive)
-- `automation` — 9 tools
+- `automation` — 10 tools
 - `system` — 5 tools
 
 ### 4. Enhanced MCP Server
