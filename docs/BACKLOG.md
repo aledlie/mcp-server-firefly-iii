@@ -1071,15 +1071,15 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P1** | #8 | Version Inconsistencies | ✅ Done | 0.25d | Backlog |
 | **P1** | #22 | Tool-Not-Found Throws Error | ✅ Done | 0.25d | Code Review |
 | **P1** | #23 | upload_attachment Wrong API Pattern | ⏸ Deferred (design decision) | 1d | Code Review |
-| **P1** | #24 | CJS/ESM Documentation Mismatch | ❌ Pending | 0.5d | Code Review |
+| **P1** | #24 | CJS/ESM Documentation Mismatch | ✅ Done | 0.5d | Code Review |
 | **P1** | #25 | Stale Tool Count Assertion | ✅ Done | 0.25d | Code Review |
-| **P2** | #9 | ESM Examples in Docs | ❌ Pending | 0.5d | Backlog |
+| **P2** | #9 | ESM Examples in Docs | ✅ Done | 0.5d | Backlog |
 | **P2** | #10 | Automation Count (9 vs 10) | ✅ Done | 0.1d | Backlog |
 | **P2** | #11 | Broken `test:enhanced` Script | ✅ Done | 0.25d | Backlog |
 | **P2** | #12 | Uncatalogued Tools Silent Fail | ✅ Done | 0.5d | Backlog |
 | **P2** | #26 | ValidationError instanceof Check | ✅ Done | 0.1d | Code Review |
-| **P2** | #27 | Schema Default Keyword Not Enforced | ❌ Pending | 0.5d | Code Review |
-| **P2** | #28 | update_transaction Schema Incomplete | ❌ Pending | 0.25d | Code Review |
+| **P2** | #27 | Schema Default Keyword Not Enforced | ✅ Done | 0.5d | Code Review |
+| **P2** | #28 | update_transaction Schema Incomplete | ✅ Done | 0.25d | Code Review |
 | **P2** | #29 | No additionalProperties: false | ⏸ Deferred | 0.25d | Code Review |
 | **P3** | #13 | `dotenv` Version Mismatch | ✅ Done (N/A) | 0.1d | Backlog |
 | **P3** | #14 | Sensitive Data Leak in Error | ✅ Done | 0.1d | Backlog |
