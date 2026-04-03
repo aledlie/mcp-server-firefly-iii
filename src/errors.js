@@ -78,6 +78,8 @@ const wrapFireflyError = (error, context = {}) => {
   if (error.code === 'ECONNREFUSED') {
     return new FireflyError('CONNECTION_FAILED', 'Cannot connect to Firefly III', {
       ...context,
+      // Note: firefly_url is included for server-side debugging only.
+      // Ensure CONNECTION_FAILED errors are NOT forwarded to untrusted clients.
       firefly_url: process.env.FIREFLY_URL,
     });
   }

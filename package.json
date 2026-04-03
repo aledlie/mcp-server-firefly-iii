@@ -11,8 +11,7 @@
     "start": "node index.js",
     "start:enhanced": "node index.enhanced.js",
     "start:web": "PORT=3000 node index.enhanced.js",
-    "test": "jest",
-    "test:enhanced": "NODE_OPTIONS='--loader=./src/test-loader.js' jest"
+    "test": "jest"
   },
   "keywords": [
     "mcp",

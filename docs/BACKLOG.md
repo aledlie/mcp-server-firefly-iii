@@ -1065,16 +1065,16 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P0** | #19 | Request Interceptor Logs in Prod | ✅ Done | 0.25d | Code Review |
 | **P0** | #20 | formatErrorResponse Not MCP-Compliant | ✅ Done | 0.25d | Code Review |
 | **P0** | #21 | String Interpolation in URLs | ✅ Done | 0.5d | Code Review |
-| **P1** | #5 | Fabricated "66 Tools" Claim | ❌ Pending | 0.5d | Backlog |
-| **P1** | #6 | Unsubstantiated "Empirical Testing" | ❌ Pending | 0.25d | Backlog |
-| **P1** | #7 | Rate Limits Misframed as Constraints | ❌ Pending | 0.5d | Backlog |
-| **P1** | #8 | Version Inconsistencies | ❌ Pending | 0.25d | Backlog |
+| **P1** | #5 | Fabricated "66 Tools" Claim | ✅ Done | 0.5d | Backlog |
+| **P1** | #6 | Unsubstantiated "Empirical Testing" | ✅ Done | 0.25d | Backlog |
+| **P1** | #7 | Rate Limits Misframed as Constraints | ✅ Done | 0.5d | Backlog |
+| **P1** | #8 | Version Inconsistencies | ✅ Done | 0.25d | Backlog |
 | **P1** | #22 | Tool-Not-Found Throws Error | ❌ Pending | 0.25d | Code Review |
 | **P1** | #23 | upload_attachment Wrong API Pattern | ❌ Pending | 1d | Code Review |
 | **P1** | #24 | CJS/ESM Documentation Mismatch | ❌ Pending | 0.5d | Code Review |
 | **P1** | #25 | Stale Tool Count Assertion | ✅ Done | 0.25d | Code Review |
 | **P2** | #9 | ESM Examples in Docs | ❌ Pending | 0.5d | Backlog |
-| **P2** | #10 | Automation Count (9 vs 10) | ❌ Pending | 0.1d | Backlog |
+| **P2** | #10 | Automation Count (9 vs 10) | ✅ Done | 0.1d | Backlog |
 | **P2** | #11 | Broken `test:enhanced` Script | ❌ Pending | 0.25d | Backlog |
 | **P2** | #12 | Uncatalogued Tools Silent Fail | ❌ Pending | 0.5d | Backlog |
 | **P2** | #26 | ValidationError instanceof Check | ✅ Done | 0.1d | Code Review |

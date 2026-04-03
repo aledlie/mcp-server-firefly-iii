@@ -181,7 +181,11 @@ function getResourceHint(toolName) {
  */
 function estimateTokenCost(toolName, inputArgs = {}, resultSize = 'default') {
   const meta = resourceMetadata[toolName];
-  if (!meta) return 0;
+  if (!meta) {
+    // Tool has no metadata entry — 54 of 66 tools are not yet catalogued (Phase 2)
+    console.warn(`[resource-metadata] No token estimate for tool: ${toolName} (returning 0)`);
+    return 0;
+  }
 
   let cost = meta.estimatedTokens;
 

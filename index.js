@@ -25,7 +25,17 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const tool = TOOLS.find(t => t.name === request.params.name);
-  if (!tool) throw new Error(`Tool not found: ${request.params.name}`);
+  if (!tool) {
+    return {
+      isError: true,
+      content: [{ type: "text", text: JSON.stringify({
+        isError: true,
+        code: "TOOL_NOT_FOUND",
+        message: `Tool not found: ${request.params.name}`,
+        availableTools: TOOLS.map(t => t.name),
+      }, null, 2) }],
+    };
+  }
   
   try {
     const result = await tool.handler(request.params.arguments || {});

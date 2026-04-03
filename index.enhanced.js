@@ -258,14 +258,14 @@ async function runServer() {
     });
 
     app.listen(PORT, () => {
-      console.error(`✅ Firefly III MCP Server (Claude-Enhanced) running at http://localhost:${PORT}`);
-      console.error(`📚 OpenAPI: http://localhost:${PORT}/openapi.json`);
-      console.error(`🔍 Metadata: http://localhost:${PORT}/tools/metadata`);
+      console.error(`Firefly III MCP Server (Claude-Enhanced) running at http://localhost:${PORT}`);
+      console.error(`OpenAPI: http://localhost:${PORT}/openapi.json`);
+      console.error(`Metadata: http://localhost:${PORT}/tools/metadata`);
     });
   } else {
     const transport = new StdioServerTransport();
     await mcpServer.connect(transport);
-    console.error('✅ Firefly III MCP Server running on stdio');
+    console.error('Firefly III MCP Server running on stdio');
   }
 }
 
