@@ -3,11 +3,11 @@
 Production-ready MCP server for Firefly III with native Claude AI support.
 
 **Key Features:**
-- 🛡️ **Zod validation** — Type-safe input handling
-- 📍 **Structured errors** — Retry guidance & context
-- 📊 **Resource metadata** — Token cost awareness
-- 🎯 **Tool organization** — Workflow optimization
-- 🚀 **REST + SSE APIs** — Web-ready deployment
+- **Zod validation** — Type-safe input handling
+- **Structured errors** — Retry guidance & context
+- **Resource metadata** — Token cost awareness
+- **Tool organization** — Workflow optimization
+- **REST + SSE APIs** — Web-ready deployment
 
 ## Quick Start
 
@@ -193,6 +193,6 @@ MIT
 
 ---
 
-**Enhancement Version:** 3.1.0  
-**Base Version:** 3.0.0 (fabianonetto/mcp-server-firefly-iii)  
+**Version:** 3.0.0  
+**Base:** fabianonetto/mcp-server-firefly-iii  
 **Last Updated:** April 2026

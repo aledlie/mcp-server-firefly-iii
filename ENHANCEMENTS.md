@@ -1,7 +1,7 @@
 # Firefly III MCP Server — Claude Ecosystem Enhancements
 
 **Date:** April 2026  
-**Version:** 3.0.0 → 3.1.0 (enhanced)  
+**Version:** 3.0.0  
 **Compatibility:** Node.js 18+, MCP Protocol 3.x
 
 ## Overview
@@ -131,7 +131,7 @@ getToolsByCategory('analytics');
 - `transactions` — 7 tools
 - `accounts` — 5 tools
 - `budgets` — 8 tools
-- `analytics` — 4 tools (expensive)
+- `analytics` — 3 tools (expensive)
 - `automation` — 10 tools
 - `system` — 5 tools
 
