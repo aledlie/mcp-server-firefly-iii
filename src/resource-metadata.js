@@ -144,14 +144,14 @@ function getResourceHint(toolName) {
 
   // Token budget guidance
   if (meta.estimatedTokens > 400) {
-    hints.push(`⚠️ Token-heavy (${meta.estimatedTokens} tokens est.)`);
+    hints.push(`Token-heavy (${meta.estimatedTokens} tokens est.)`);
   }
 
   // Cacheability
   if (meta.cacheable === true) {
-    hints.push(`✅ Cacheable (${meta.cacheMaxAge}s)`);
+    hints.push(`Cacheable (${meta.cacheMaxAge}s)`);
   } else if (meta.cacheable === 'conditional') {
-    hints.push(`⚠️ Conditional cache`);
+    hints.push(`Conditional cache`);
   }
 
   // Rate limits
@@ -161,12 +161,12 @@ function getResourceHint(toolName) {
 
   // Result size warnings
   if (meta.resultSize === 'large') {
-    hints.push(`📦 Large responses possible`);
+    hints.push(`Large responses possible`);
   }
 
   // Mutation warning
   if (!meta.cacheable && meta.estimatedTokens > 200) {
-    hints.push(`⚡ Mutating operation`);
+    hints.push(`Mutating operation`);
   }
 
   return {

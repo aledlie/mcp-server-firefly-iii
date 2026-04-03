@@ -1086,13 +1086,13 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P3** | #30 | Emoji in Startup Messages | ✅ Done | 0.05d | Code Review |
 | **P3** | #31 | Debug Logging Always Enabled | ✅ Done | 0.1d | Code Review |
 
-**Summary:**
-- **P0 (Critical):** 11 issues (4 fixed, 7 pending) — Blocks functionality
-- **P1 (High):** 9 issues (pending) — Correctness/Trust
-- **P2 (Medium):** 9 issues (pending) — Quality/Discoverability
-- **P3 (Low):** 4 issues (pending) — Polish
+**Summary (Updated 2026-04-03):**
+- **P0 (Critical):** 11 issues — all Done
+- **P1 (High):** 9 issues — 8 Done, 1 Deferred (#23 — design decision)
+- **P2 (Medium):** 9 issues — 8 Done, 1 Deferred (#29 — Phase 2)
+- **P3 (Low):** 4 issues — all Done
 
-**Total Estimated Effort:** ~11 days (P0+P1+P2+P3, excluding #2 and #23 which require design decisions)
+**Remaining:** 2 deferred items (#23 upload_attachment multipart, #29 additionalProperties)
 
 ---
 
