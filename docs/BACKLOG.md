@@ -667,10 +667,12 @@ app.post('/messages', async (req, res) => {
 ```
 
 **Acceptance Criteria:**
-- [ ] Multiple simultaneous SSE clients can connect without overwriting each other
-- [ ] Each client's messages route to the correct transport
-- [ ] Closed connections are cleaned up from session map
+- [x] Multiple simultaneous SSE clients can connect without overwriting each other
+- [x] Each client's messages route to the correct transport
+- [x] Closed connections are cleaned up from session map
 - [ ] Test: two concurrent SSE clients send requests, verify responses go to correct client
+
+**Status: Done** — commit `9971398` — session Map implemented in both index.js and index.enhanced.js. Integration test deferred to Phase 2.
 
 **Estimate:** 0.5 day
 
@@ -1053,7 +1055,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P0** | #15 | Dual Server Instantiation | ✅ Done | 1d | Code Review |
 | **P0** | #16 | Missing Source Files (validation, metadata) | ✅ Done | 0.5d | Code Review |
 | **P0** | #17 | MCP ListTools Violates Spec | ✅ Done | 0.5d | Code Review |
-| **P0** | #18 | SSE Transport Connection Unsafe | ❌ Pending | 0.5d | Code Review |
+| **P0** | #18 | SSE Transport Connection Unsafe | ✅ Done | 0.5d | Code Review |
 | **P0** | #19 | Request Interceptor Logs in Prod | ❌ Pending | 0.25d | Code Review |
 | **P0** | #20 | formatErrorResponse Not MCP-Compliant | ❌ Pending | 0.25d | Code Review |
 | **P0** | #21 | String Interpolation in URLs | ❌ Pending | 0.5d | Code Review |

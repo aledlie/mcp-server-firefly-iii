@@ -24,10 +24,12 @@ const apiClient = axios.create({
   },
 });
 
-// Debug interceptor to capture raw outgoing requests
+// Debug interceptor — only active when DEBUG=true or NODE_ENV=development
+// Never log params (may contain credentials)
 apiClient.interceptors.request.use(config => {
-  console.error(`DEBUG: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
-  if (config.params) console.error(`DEBUG PARAMS: ${JSON.stringify(config.params)}`);
+  if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
+    console.error(`[API] ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
+  }
   return config;
 });
 
