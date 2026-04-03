@@ -113,7 +113,7 @@ UNKNOWN_ERROR              other
 transactions    (7 tools)
 accounts        (5 tools)
 budgets         (8 tools)
-analytics       (4 tools)  ← expensive
+analytics       (3 tools)  ← expensive
 automation      (10 tools)
 system          (5 tools)
 ```
