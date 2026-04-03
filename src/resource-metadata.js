@@ -196,21 +196,27 @@ function estimateTokenCost(toolName, inputArgs = {}, resultSize = 'default') {
 
 /**
  * Tool dependency graph for workflow planning
+ * Returns tools in topological order: dependencies appear before their dependents.
  */
 function resolveDependencies(toolNames) {
-  const resolved = new Set();
-  const queue = [...toolNames];
+  const resolved = [];
+  const visited = new Set();
 
-  while (queue.length > 0) {
-    const tool = queue.shift();
-    if (resolved.has(tool)) continue;
-
+  function visit(tool) {
+    if (visited.has(tool)) return;
+    visited.add(tool);
     const deps = resourceMetadata[tool]?.dependencies || [];
-    queue.push(...deps);
-    resolved.add(tool);
+    for (const dep of deps) {
+      visit(dep);
+    }
+    resolved.push(tool);
   }
 
-  return Array.from(resolved);
+  for (const tool of toolNames) {
+    visit(tool);
+  }
+
+  return resolved;
 }
 
 /**
