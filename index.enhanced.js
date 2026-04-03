@@ -13,6 +13,7 @@ const express = require('express');
 const { apiClient, FIREFLY_URL, FIREFLY_TOKEN, PORT } = require('./src/config.js');
 const {
   formatErrorResponse,
+  toMCPErrorResult,
   wrapFireflyError,
   FireflyError,
   createErrorInterceptor,
@@ -126,24 +127,16 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       ],
     };
   } catch (error) {
-    let formatted;
-
-    if (error instanceof ValidationError) {
-      formatted = {
-        isError: true,
+    if (error.name === 'ValidationError' || error instanceof ValidationError) {
+      return toMCPErrorResult({
         code: 'VALIDATION_ERROR',
         message: error.message,
         errors: error.errors,
-      };
-    } else {
-      const firefly = wrapFireflyError(error, { tool: tool.name });
-      formatted = formatErrorResponse(firefly);
+        isRetryable: false,
+      });
     }
 
-    return {
-      isError: true,
-      content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
-    };
+    return toMCPErrorResult(wrapFireflyError(error, { tool: tool.name }));
   }
 });
 

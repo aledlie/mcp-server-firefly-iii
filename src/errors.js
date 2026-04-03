@@ -144,6 +144,18 @@ function getRetryGuidance(code) {
 }
 
 /**
+ * Produce a fully-formed MCP CallToolResult for an error.
+ * Both index.js and index.enhanced.js use this to ensure consistent error surfaces.
+ */
+const toMCPErrorResult = (error) => {
+  const formatted = formatErrorResponse(error);
+  return {
+    isError: true,
+    content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
+  };
+};
+
+/**
  * Axios error interceptor
  */
 const createErrorInterceptor = () => {
@@ -156,5 +168,6 @@ module.exports = {
   FireflyError,
   wrapFireflyError,
   formatErrorResponse,
+  toMCPErrorResult,
   createErrorInterceptor,
 };

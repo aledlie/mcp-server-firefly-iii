@@ -8,6 +8,7 @@ const {
 } = require("@modelcontextprotocol/sdk/types.js");
 const express = require("express");
 const { FIREFLY_URL, FIREFLY_TOKEN, PORT, apiClient } = require("./src/config.js");
+const { toMCPErrorResult, wrapFireflyError } = require("./src/errors.js");
 
 // Import tool registry (no side effects — no Server instantiation)
 const { TOOLS } = require('./src/tools/registry.js');
@@ -30,7 +31,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     const result = await tool.handler(request.params.arguments || {});
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   } catch (error) {
-    return { isError: true, content: [{ type: "text", text: error.response ? JSON.stringify(error.response.data) : error.message }] };
+    return toMCPErrorResult(wrapFireflyError(error, { tool: request.params.name }));
   }
 });
 

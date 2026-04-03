@@ -709,10 +709,12 @@ apiClient.interceptors.request.use((config) => {
 ```
 
 **Acceptance Criteria:**
-- [ ] Request logging disabled by default in production
-- [ ] Logging only active when `DEBUG=true` or `NODE_ENV === 'development'`
-- [ ] Never log `config.params` without an explicit allowlist
-- [ ] Startup messages (✅ Server running...) still print unconditionally
+- [x] Request logging disabled by default in production
+- [x] Logging only active when `DEBUG=true` or `NODE_ENV === 'development'`
+- [x] Never log `config.params` without an explicit allowlist
+- [x] Startup messages (server running...) still print unconditionally
+
+**Status: Done** — commit `47c93cc`
 
 **Estimate:** 0.25 day
 
@@ -1056,7 +1058,7 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P0** | #16 | Missing Source Files (validation, metadata) | ✅ Done | 0.5d | Code Review |
 | **P0** | #17 | MCP ListTools Violates Spec | ✅ Done | 0.5d | Code Review |
 | **P0** | #18 | SSE Transport Connection Unsafe | ✅ Done | 0.5d | Code Review |
-| **P0** | #19 | Request Interceptor Logs in Prod | ❌ Pending | 0.25d | Code Review |
+| **P0** | #19 | Request Interceptor Logs in Prod | ✅ Done | 0.25d | Code Review |
 | **P0** | #20 | formatErrorResponse Not MCP-Compliant | ❌ Pending | 0.25d | Code Review |
 | **P0** | #21 | String Interpolation in URLs | ❌ Pending | 0.5d | Code Review |
 | **P1** | #5 | Fabricated "66 Tools" Claim | ❌ Pending | 0.5d | Backlog |
