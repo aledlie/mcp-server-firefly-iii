@@ -34,37 +34,10 @@ const {
   createValidatedHandler,
 } = require('./src/validation.js');
 
-// Import tool modules (CommonJS)
-const coreTools = require('./src/tools/core.js');
-const accountsTools = require('./src/tools/accounts.js');
-const transactionsTools = require('./src/tools/transactions.js');
-const budgetsTools = require('./src/tools/budgets.js');
-const automationTools = require('./src/tools/automation.js');
-const systemTools = require('./src/tools/system.js');
-const insightsTools = require('./src/tools/insights.js');
-const metaTools = require('./src/tools/meta.js');
-const billsTools = require('./src/tools/bills.js');
-const groupsTools = require('./src/tools/groups.js');
-const recurringTools = require('./src/tools/recurring.js');
-const adminTools = require('./src/tools/admin.js');
-
-// Aggregate tools
-const toolModules = [
-  coreTools,
-  accountsTools,
-  transactionsTools,
-  budgetsTools,
-  automationTools,
-  systemTools,
-  insightsTools,
-  metaTools,
-  billsTools,
-  groupsTools,
-  recurringTools,
-  adminTools,
-];
-
-const TOOLS = toolModules.flat();
+// Tool modules in src/tools/ are not yet implemented (Phase 2).
+// Load tools from the upstream index.js instead to allow the server to start.
+const { TOOLS: upstreamTools } = require('./index.js');
+const TOOLS = upstreamTools || [];
 
 /**
  * Enhance tool metadata with resource hints and validation
