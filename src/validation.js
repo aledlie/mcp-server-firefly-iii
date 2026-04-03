@@ -7,7 +7,7 @@ const { zodToJsonSchema } = require('zod-to-json-schema');
  */
 
 // Common reusable schemas
-export const schemas = {
+const schemas = {
   id: z.string().min(1, 'ID required').describe('Unique identifier'),
   uuid: z.string().uuid('Invalid UUID').describe('UUID identifier'),
   iso8601: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'YYYY-MM-DD format').describe('ISO 8601 date'),
@@ -23,42 +23,15 @@ export const schemas = {
 };
 
 /**
- * Create validated handler wrapper
- * Catches and structures validation errors with helpful context
- */
-export const createValidatedHandler = (schema, handler) => {
-  return async (args) => {
-    try {
-      const validated = await schema.parseAsync(args);
-      return await handler(validated);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError('Input validation failed', error.errors);
-      }
-      throw error;
-    }
-  };
-};
-
-/**
- * Convert Zod schema to MCP-compatible JSON schema
- * Includes descriptions, examples, and constraints
- */
-export const toMCPSchema = (zodSchema) => {
-  return zodToJsonSchema(zodSchema, {
-    target: 'draft2020-12',
-    $refStrategy: 'none',
-  });
-};
-
-/**
  * Validation error with structured context
+ * Handles both Zod v3 (error.errors) and Zod v4 (error.issues)
  */
-export class ValidationError extends Error {
+class ValidationError extends Error {
   constructor(message, zodErrors) {
     super(message);
     this.name = 'ValidationError';
-    this.errors = zodErrors.map(e => ({
+    const issues = zodErrors || [];
+    this.errors = issues.map(e => ({
       field: e.path.join('.') || 'root',
       message: e.message,
       code: e.code,
@@ -69,9 +42,40 @@ export class ValidationError extends Error {
 }
 
 /**
+ * Create validated handler wrapper
+ * Catches and structures validation errors with helpful context
+ */
+const createValidatedHandler = (schema, handler) => {
+  return async (args) => {
+    try {
+      const validated = await schema.parseAsync(args);
+      return await handler(validated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        // Support both Zod v3 (error.errors) and Zod v4 (error.issues)
+        const issues = error.issues || error.errors || [];
+        throw new ValidationError('Input validation failed', issues);
+      }
+      throw error;
+    }
+  };
+};
+
+/**
+ * Convert Zod schema to MCP-compatible JSON schema
+ * Includes descriptions, examples, and constraints
+ */
+const toMCPSchema = (zodSchema) => {
+  return zodToJsonSchema(zodSchema, {
+    target: 'draft2020-12',
+    $refStrategy: 'none',
+  });
+};
+
+/**
  * Pre-built common validators
  */
-export const validators = {
+const validators = {
   listParams: z.object({
     limit: z.number().int().positive().max(500).default(50).describe('Max results to return'),
     offset: z.number().int().nonnegative().default(0).describe('Pagination offset'),
