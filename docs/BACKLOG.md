@@ -523,34 +523,577 @@ firefly_url: process.env.FIREFLY_URL,
 
 ---
 
-## Summary Table
+---
 
-| Priority | ID | Title | Status | Est. | 
-|---|---|---|---|---|
-| P0 | #1 | Zod v4 API Breaking Change | Done | 0.5d |
-| P0 | #2 | Missing `src/tools/` Directory | Done (Option B) | 1–3d |
-| P0 | #3 | Mixed Module Syntax | Done | 0.25d |
-| P0 | #4 | `resolveDependencies()` Order Bug | Done | 0.5d |
-| P1 | #5 | Fabricated "66 Tools" Claim | Pending | 0.5d |
-| P1 | #6 | Unsubstantiated "Empirical Testing" | Pending | 0.25d |
-| P1 | #7 | Rate Limits Misframed as Constraints | Pending | 0.5d |
-| P1 | #8 | Version Inconsistencies | Pending | 0.25d |
-| P2 | #9 | ESM Examples in Docs | Pending | 0.5d |
-| P2 | #10 | Automation Count (9 vs 10) | Pending | 0.1d |
-| P2 | #11 | Broken `test:enhanced` Script | Pending | 0.25d |
-| P2 | #12 | Uncatalogued Tools Silent Fail | Pending | 0.5d |
-| P3 | #13 | `dotenv` Version Mismatch | Pending | 0.1d |
-| P3 | #14 | Sensitive Data Leak in Error | Pending | 0.1d |
+## P0 (Critical) — Additional Findings from Code Review
 
-**Total Estimated Effort:** ~5.5 days (excluding #2 which requires architectural decision)
+### Issue #15: Dual Server Instantiation on Startup
+
+**File:** `index.enhanced.js:41` + `index.js` (both instantiate Server)  
+**Severity:** CRITICAL — Creates hidden zombie instance
+
+**Problem:**
+`index.enhanced.js` calls `require('./index.js')` to load `TOOLS`. This triggers the upstream Server initialization in `index.js`, which:
+1. Creates a `Server` instance (`mcpServer` in index.js)
+2. Registers two `setRequestHandler` callbacks for the same schemas
+3. Never connects this server to a transport
+
+Result: two `Server` instances in same process, one is orphaned. If `index.enhanced.js` is restarted in tests, orphaned instances accumulate.
+
+**Solution:**
+Extract only the tool registry from `index.js` into a dedicated `src/tools/registry.js` module that performs no side effects. Both entry points should import only tools, not the server.
+
+**Acceptance Criteria:**
+- [ ] No `Server` instantiation in `src/` modules
+- [ ] `index.js` and `index.enhanced.js` each create exactly one Server
+- [ ] No orphaned handlers or instances in process
+
+**Estimate:** 1 day
+
+---
+
+### Issue #16: Missing Source Files Break Server on Startup
+
+**Files:** `src/validation.js` (referenced line 32–35), `src/resource-metadata.js` (referenced line 22–28)  
+**Severity:** CRITICAL — Prevents server startup
+
+**Problem:**
+`index.enhanced.js` unconditionally imports:
+```javascript
+const { ... } = require('./src/validation.js');        // ❌ MISSING
+const { ... } = require('./src/resource-metadata.js'); // ❌ MISSING
+```
+
+Running `npm run start:enhanced` or `node index.enhanced.js` fails with `MODULE_NOT_FOUND` before any handler is registered.
+
+**Status:** P0 issue #2 was marked "Done (Option B)" by selecting upstream tool loading. However, `src/validation.js` and `src/resource-metadata.js` are STILL referenced and STILL missing.
+
+**Solution:**
+Either:
+- **A)** Commit the missing files (validation.js, resource-metadata.js) with complete implementations
+- **B)** Remove all imports of missing modules from `index.enhanced.js` and provide alternatives
+
+**Recommendation:** Option A — these files have fixes applied (Zod v4 compat, topological sort). Commit them.
+
+**Acceptance Criteria:**
+- [ ] `src/validation.js` exists and exports all required symbols
+- [ ] `src/resource-metadata.js` exists and exports all required symbols
+- [ ] `npm run start:enhanced` starts without MODULE_NOT_FOUND
+- [ ] File sizes: validation.js > 100 lines, resource-metadata.js > 200 lines
+
+**Estimate:** 0.5 day (commit existing files)
+
+---
+
+### Issue #17: MCP ListTools Response Violates Spec
+
+**File:** `index.enhanced.js:82–91`  
+**Severity:** HIGH — Breaks spec compliance
+
+**Problem:**
+```javascript
+mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: enrichedTools.map(({ _handler, ..., ...tool }) => ({
+    ...tool,
+    description: tool.description + (_claudeHints?.length ? `...` : ''),  // ❌ Mutates field
+    _metadata: {                                                           // ❌ Non-standard field
+      category: _category,
+      resourceHints: _resourceMetadata,
+    },
+  })),
+}));
+```
+
+The MCP spec for `ListToolsResult` does not include `_metadata`. Injecting custom fields violates the schema and may cause clients to reject the response. The `description` mutation breaks the original tool description semantics.
+
+**Solution:**
+- Do NOT inject `_metadata` into tool objects
+- Use the `/tools/metadata` REST endpoint for structured metadata instead
+- Keep tool descriptions unmodified
+- Store hints in a separate mapping or serve via REST only
+
+**Acceptance Criteria:**
+- [ ] `ListToolsResponse` contains only: `name`, `description`, `inputSchema` per spec
+- [ ] No custom `_metadata` field in response
+- [ ] Descriptions are original, unmodified
+- [ ] Metadata available via `/tools/metadata` REST endpoint only
+
+**Estimate:** 0.5 day
+
+---
+
+### Issue #18: SSE Transport Connection Not Safe for Multiple Clients
+
+**File:** `index.enhanced.js:171–178`  
+**Severity:** HIGH — Leaks connections, routes to wrong client
+
+**Problem:**
+```javascript
+let transport;  // ❌ Single shared variable
+
+app.get('/sse', async (req, res) => {
+  transport = new SSEServerTransport('/messages', res);  // ❌ Overwrites previous
+  await mcpServer.connect(transport);
+});
+```
+
+If Client A connects, then Client B connects before A disconnects, Client B's assignment overwrites the transport. All future messages go to Client B only. Client A's connection leaks.
+
+**Solution:**
+Use a session-based map:
+```javascript
+const sessions = new Map();  // sessionId → transport
+
+app.get('/sse', async (req, res) => {
+  const sessionId = req.query.sessionId || crypto.randomUUID();
+  const transport = new SSEServerTransport(`/messages?sessionId=${sessionId}`, res);
+  sessions.set(sessionId, transport);
+  await mcpServer.connect(transport);
+  res.on('close', () => sessions.delete(sessionId));
+});
+
+app.post('/messages', async (req, res) => {
+  const sessionId = req.query.sessionId;
+  const transport = sessions.get(sessionId);
+  if (transport) await transport.handlePostMessage(req, res);
+  else res.status(400).json({ error: 'Session not found' });
+});
+```
+
+**Acceptance Criteria:**
+- [ ] Multiple simultaneous SSE clients can connect without overwriting each other
+- [ ] Each client's messages route to the correct transport
+- [ ] Closed connections are cleaned up from session map
+- [ ] Test: two concurrent SSE clients send requests, verify responses go to correct client
+
+**Estimate:** 0.5 day
+
+---
+
+### Issue #19: Request Interceptor Logs Params in Production
+
+**File:** `src/config.js:28–32`  
+**Severity:** HIGH — Leaks potential credentials
+
+**Problem:**
+```javascript
+apiClient.interceptors.request.use((config) => {
+  console.error(`[API] ${config.method.toUpperCase()} ${config.baseURL + config.url}`);
+  if (config.params) console.error('Params:', config.params);  // ❌ NO GATE
+  return config;
+});
+```
+
+This interceptor:
+1. Logs to stderr unconditionally (no `NODE_ENV !== 'production'` check)
+2. Logs `config.params` in full, which could contain credentials if future code passes them
+3. MCP stdio uses stderr for protocol, so these logs pollute the transport
+
+**Solution:**
+```javascript
+apiClient.interceptors.request.use((config) => {
+  if (process.env.DEBUG || process.env.NODE_ENV !== 'production') {
+    console.error(`[API] ${config.method.toUpperCase()} ${config.baseURL + config.url}`);
+    // NEVER log params without whitelist
+  }
+  return config;
+});
+```
+
+**Acceptance Criteria:**
+- [ ] Request logging disabled by default in production
+- [ ] Logging only active when `DEBUG=true` or `NODE_ENV === 'development'`
+- [ ] Never log `config.params` without an explicit allowlist
+- [ ] Startup messages (✅ Server running...) still print unconditionally
+
+**Estimate:** 0.25 day
+
+---
+
+### Issue #20: formatErrorResponse Output Not MCP-Compliant
+
+**File:** `src/errors.js:104–128` + `index.enhanced.js:151–156`  
+**Severity:** HIGH — Error contract diverges between entry points
+
+**Problem:**
+- `index.enhanced.js` (enhanced server):  
+  Returns `{ isError: true, content: [{ type: 'text', text: JSON.stringify(formatted) }] }`
+- `index.js` (upstream server):  
+  Returns `{ isError: true, content: [{ type: 'text', text: error.message }] }`
+
+Two entry points have divergent error surfaces. `formatErrorResponse` returns plain object, not a fully formed `CallToolResult`.
+
+**Solution:**
+Create a single `toMCPErrorResult(error)` function in `src/errors.js`:
+```javascript
+function toMCPErrorResult(error) {
+  const formatted = formatErrorResponse(error);
+  return {
+    isError: true,
+    content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
+  };
+}
+```
+
+Both entry points use it:
+```javascript
+// index.enhanced.js & index.js
+catch (error) {
+  return toMCPErrorResult(error);
+}
+```
+
+**Acceptance Criteria:**
+- [ ] Single `toMCPErrorResult` function in `src/errors.js`
+- [ ] Both `index.js` and `index.enhanced.js` use it
+- [ ] Error response shape is identical from both entry points
+- [ ] Response always valid `CallToolResult` per MCP spec
+
+**Estimate:** 0.25 day
+
+---
+
+### Issue #21: Tool Handlers Use String Interpolation for URLs
+
+**File:** `src/tools/insights.js:40, 53, 65` (if it exists)  
+**Severity:** HIGH — Bypasses axios URL encoding, breaks malformed URLs
+
+**Problem:**
+```javascript
+apiClient.get(`/charts/account/overview?start=${args.start}&end=${args.end}`)
+```
+
+Does not URL-encode `args.start` or `args.end`. Special characters (spaces, `&`, `=`) produce malformed URLs. Query params should use axios's `params` option for proper serialization.
+
+**Solution:**
+```javascript
+apiClient.get('/charts/account/overview', { params: { start: args.start, end: args.end } })
+```
+
+**Acceptance Criteria:**
+- [ ] All `apiClient.get/post/put/delete` calls use `{ params: {...} }` config
+- [ ] No string interpolation for query parameters
+- [ ] Test: passing date like `2024-01-01` is correctly encoded in URL
+
+**Estimate:** 0.5 day
+
+---
+
+### Issue #22: Tool-Not-Found Throws Error Instead of Returning Error Result
+
+**File:** `index.js:54`  
+**Severity:** MEDIUM — Protocol-level error instead of tool-level
+
+**Problem:**
+```javascript
+if (!tool) {
+  throw new Error(`Tool not found: ${request.params.name}`);  // ❌ THROWS
+}
+```
+
+Throwing inside a `setRequestHandler` callback causes the SDK to emit a JSON-RPC `-32603` (Internal Error) protocol-level error, breaking the client connection. Should return a graceful tool-level error.
+
+**Solution:**
+```javascript
+if (!tool) {
+  return {
+    isError: true,
+    content: [{ type: 'text', text: JSON.stringify({
+      code: 'TOOL_NOT_FOUND',
+      message: `Tool not found: ${request.params.name}`,
+      availableTools: enrichedTools.map(t => t.name),
+    }, null, 2) }],
+  };
+}
+```
+
+**Acceptance Criteria:**
+- [ ] Missing tool returns `{ isError: true, content: [...] }`
+- [ ] No exceptions thrown from request handlers
+- [ ] Response includes list of available tools for discoverability
+
+**Estimate:** 0.25 day
+
+---
+
+## P1 (High) — Additional Findings
+
+### Issue #23: upload_attachment Tool Uses Wrong API Pattern
+
+**File:** If `src/tools/` exists, check for `upload_attachment`  
+**Severity:** MEDIUM — Tool doesn't match Firefly API
+
+**Problem:**
+The tool likely passes base64 content as a JSON field:
+```javascript
+POST /attachments
+{ "filename": "...", "content": "base64..." }
+```
+
+Firefly III requires binary multipart upload:
+```javascript
+POST /attachments
+Content-Type: multipart/form-data
+[binary data]
+```
+
+The current pattern will be rejected by the API.
+
+**Solution:**
+Either implement multipart upload with `form-data` library or remove the tool until multipart is supported.
+
+**Estimate:** 1 day
+
+---
+
+### Issue #24: CommonJS/ESM Documentation Mismatch
+
+**Files:** `CLAUDE_INTEGRATION.md`, `ENHANCEMENTS.md`, `README_CLAUDE.md`  
+**Severity:** MEDIUM — Docs show ESM, code is CJS
+
+**Problem:**
+Commit `2d64a19` converted all files to CommonJS, but documentation examples still show ES module `import` syntax. Following examples will fail with `SyntaxError: Cannot use import statement outside a module`.
+
+**Solution:**
+Already documented as P2 issue #9. Ensure all code examples show `require()` and `module.exports`.
+
+**Estimate:** 0.5 day
+
+---
+
+### Issue #25: Test Assertion References Stale Tool Count
+
+**File:** `index.test.js:14`  
+**Severity:** MEDIUM — Fragile, masking tool changes
+
+**Problem:**
+```javascript
+expect(TOOLS.length).toBe(65);  // ❌ Hardcoded count
+```
+
+If tool count changes (tools added/removed), test silently breaks. Assertion is not documenting coverage, just matching a number.
+
+**Solution:**
+Replace with meaningful assertions:
+```javascript
+expect(TOOLS.length).toBeGreaterThan(0);
+TOOLS.forEach(tool => {
+  expect(tool).toHaveProperty('name');
+  expect(tool).toHaveProperty('description');
+  expect(tool).toHaveProperty('inputSchema');
+  expect(tool).toHaveProperty('handler');
+});
+```
+
+**Estimate:** 0.25 day
+
+---
+
+## P2 (Medium) — Additional Findings
+
+### Issue #26: ValidationError instanceof Check Across Module Boundary
+
+**File:** `index.enhanced.js:141`  
+**Severity:** LOW-MEDIUM — Check will fail if validation.js missing
+
+**Problem:**
+```javascript
+if (error instanceof ValidationError) {
+  // ...
+}
+```
+
+If `src/validation.js` is missing (Issue #16), this code is unreachable. Even if the file exists, Zod error shapes changed in v4, and `instanceof` checks can fail silently across module boundaries. Better to use name-based guard.
+
+**Solution:**
+```javascript
+if (error.name === 'ValidationError' || error instanceof ValidationError) {
+  // ...
+}
+```
+
+**Estimate:** 0.1 day
+
+---
+
+### Issue #27: Schema Fields Use `default` Keyword Without Enforcement
+
+**File:** Tool definitions in `src/tools/` (if they exist)  
+**Severity:** LOW — Misleading schema, no actual default
+
+**Problem:**
+```javascript
+const inputSchema = {
+  properties: {
+    limit: { type: 'number', default: 10 },  // ❌ NOT ENFORCED BY MCP SDK
+  },
+};
+```
+
+JSON Schema `default` is not enforced by MCP's validator. Handlers must apply defaults manually with `args.limit || 10`. This creates two sources of truth and confuses callers.
+
+**Solution:**
+Remove `default` from schema, rely only on handler-level defaults:
+```javascript
+const inputSchema = {
+  properties: {
+    limit: { type: 'number', description: 'Max results (default: 10)' },
+  },
+};
+
+// In handler:
+const limit = args.limit ?? 10;
+```
+
+**Estimate:** 0.5 day (across all tools)
+
+---
+
+### Issue #28: update_transaction Schema Incomplete
+
+**File:** Tool definition (if it exists)  
+**Severity:** LOW — Can't update all fields
+
+**Problem:**
+If `update_transaction` only documents `id` and `description` as updatable, Claude cannot update amount, date, category, or splits. This will cause unexpected failures.
+
+**Solution:**
+Expand schema to match `create_transaction` with all fields optional except `id`:
+```javascript
+{
+  id: string,           // Required
+  type: enum,          // Optional
+  source_id: string,   // Optional
+  destination_id: string,  // Optional
+  amount: number,      // Optional
+  date: date,          // Optional
+  // ... etc
+}
+```
+
+**Estimate:** 0.25 day
+
+---
+
+### Issue #29: No additionalProperties: false in Tool Schemas
+
+**File:** All tool definitions  
+**Severity:** LOW — Allows parameter injection
+
+**Problem:**
+Without `additionalProperties: false`, Claude can pass arbitrary extra fields that are silently forwarded to Firefly API. This may trigger unexpected behavior.
+
+**Solution:**
+Add to all `inputSchema` objects:
+```javascript
+const inputSchema = {
+  type: 'object',
+  additionalProperties: false,  // ← Add this
+  properties: { ... },
+};
+```
+
+**Estimate:** 0.25 day (automated script across all tools)
+
+---
+
+## P3 (Low) — Additional Findings
+
+### Issue #30: Emoji in Startup Messages Violates Style Guide
+
+**File:** `index.enhanced.js:268–271`  
+**Severity:** LOW — Violates CLAUDE.md "no emojis" rule
+
+**Problem:**
+```javascript
+console.error(`✅ Firefly III MCP Server (Claude-Enhanced) running at http://localhost:${PORT}`);
+console.error(`📚 OpenAPI: http://localhost:${PORT}/openapi.json`);
+```
+
+Your CLAUDE.md explicitly states: "Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked."
+
+**Solution:**
+Remove emoji, use plain text:
+```javascript
+console.error(`Firefly III MCP Server (Claude-Enhanced) running at http://localhost:${PORT}`);
+console.error(`OpenAPI: http://localhost:${PORT}/openapi.json`);
+```
+
+**Estimate:** 0.05 day
+
+---
+
+### Issue #31: Debug Logging Always Enabled
+
+**File:** `src/config.js:28–32`  
+**Severity:** LOW — Noise in production logs
+
+**Problem:**
+Axios request interceptor logs all API calls to stderr unconditionally, including in production. This creates noise and pollutes the MCP stdio transport.
+
+**Solution:** (Duplicate of Issue #19)
+Gate on `DEBUG` or `NODE_ENV !== 'production'`.
+
+---
+
+## Summary Table (Updated)
+
+| Priority | ID | Title | Status | Est. | Source |
+|---|---|---|---|---|---|
+| **P0** | #1 | Zod v4 API Breaking Change | ✅ Done | 0.5d | Backlog |
+| **P0** | #2 | Missing `src/tools/` Directory | ✅ Done (B) | 1–3d | Backlog |
+| **P0** | #3 | Mixed Module Syntax | ✅ Done | 0.25d | Backlog |
+| **P0** | #4 | `resolveDependencies()` Order Bug | ✅ Done | 0.5d | Backlog |
+| **P0** | #15 | Dual Server Instantiation | ❌ Pending | 1d | Code Review |
+| **P0** | #16 | Missing Source Files (validation, metadata) | ⚠️ Partial | 0.5d | Code Review |
+| **P0** | #17 | MCP ListTools Violates Spec | ❌ Pending | 0.5d | Code Review |
+| **P0** | #18 | SSE Transport Connection Unsafe | ❌ Pending | 0.5d | Code Review |
+| **P0** | #19 | Request Interceptor Logs in Prod | ❌ Pending | 0.25d | Code Review |
+| **P0** | #20 | formatErrorResponse Not MCP-Compliant | ❌ Pending | 0.25d | Code Review |
+| **P0** | #21 | String Interpolation in URLs | ❌ Pending | 0.5d | Code Review |
+| **P1** | #5 | Fabricated "66 Tools" Claim | ❌ Pending | 0.5d | Backlog |
+| **P1** | #6 | Unsubstantiated "Empirical Testing" | ❌ Pending | 0.25d | Backlog |
+| **P1** | #7 | Rate Limits Misframed as Constraints | ❌ Pending | 0.5d | Backlog |
+| **P1** | #8 | Version Inconsistencies | ❌ Pending | 0.25d | Backlog |
+| **P1** | #22 | Tool-Not-Found Throws Error | ❌ Pending | 0.25d | Code Review |
+| **P1** | #23 | upload_attachment Wrong API Pattern | ❌ Pending | 1d | Code Review |
+| **P1** | #24 | CJS/ESM Documentation Mismatch | ❌ Pending | 0.5d | Code Review |
+| **P1** | #25 | Stale Tool Count Assertion | ❌ Pending | 0.25d | Code Review |
+| **P2** | #9 | ESM Examples in Docs | ❌ Pending | 0.5d | Backlog |
+| **P2** | #10 | Automation Count (9 vs 10) | ❌ Pending | 0.1d | Backlog |
+| **P2** | #11 | Broken `test:enhanced` Script | ❌ Pending | 0.25d | Backlog |
+| **P2** | #12 | Uncatalogued Tools Silent Fail | ❌ Pending | 0.5d | Backlog |
+| **P2** | #26 | ValidationError instanceof Check | ⚠️ Minor | 0.1d | Code Review |
+| **P2** | #27 | Schema Default Keyword Not Enforced | ❌ Pending | 0.5d | Code Review |
+| **P2** | #28 | update_transaction Schema Incomplete | ❌ Pending | 0.25d | Code Review |
+| **P2** | #29 | No additionalProperties: false | ❌ Pending | 0.25d | Code Review |
+| **P3** | #13 | `dotenv` Version Mismatch | ❌ Pending | 0.1d | Backlog |
+| **P3** | #14 | Sensitive Data Leak in Error | ❌ Pending | 0.1d | Backlog |
+| **P3** | #30 | Emoji in Startup Messages | ❌ Pending | 0.05d | Code Review |
+| **P3** | #31 | Debug Logging Always Enabled | ❌ Pending | 0.1d | Code Review |
+
+**Summary:**
+- **P0 (Critical):** 11 issues (4 fixed, 7 pending) — Blocks functionality
+- **P1 (High):** 9 issues (pending) — Correctness/Trust
+- **P2 (Medium):** 9 issues (pending) — Quality/Discoverability
+- **P3 (Low):** 4 issues (pending) — Polish
+
+**Total Estimated Effort:** ~11 days (P0+P1+P2+P3, excluding #2 and #23 which require design decisions)
+
+---
+
+## Recommended Priority Order
+
+1. **CRITICAL FIRST:** Fix #15, #16, #17, #18, #19, #20, #21 (P0 blockers) — ~4 days
+2. **High Trust:** Fix #5–8, #22–25 (P1 correctness) — ~3.5 days
+3. **Quality:** Fix #9–12, #26–29 (P2 discoverability) — ~3 days
+4. **Polish:** Fix #13, #14, #30, #31 (P3) — ~0.5 days
 
 ---
 
 ## Next Steps
 
-1. **Decision Required:** Issue #2 — resolve whether `src/tools/` should be implemented in Phase 1 or deferred
-2. **Execute P0 fixes:** Issues #1, #3, #4 (2 days)
-3. **Execute P1 fixes:** Issues #5–8 (1.5 days)
-4. **Execute P2 fixes:** Issues #9–12 (1.25 days)
-5. **Regression test:** Run full suite after each priority level
+1. **Immediately:** Address P0 issues #15–21 (architectural/protocol fixes)
+2. **Then:** Address P1 issues #5–8, #22–25 (correctness and trust)
+3. **Then:** Address P2/P3 issues (documentation, quality, polish)
 
