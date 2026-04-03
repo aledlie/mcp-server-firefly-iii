@@ -527,10 +527,10 @@ firefly_url: process.env.FIREFLY_URL,
 
 | Priority | ID | Title | Status | Est. | 
 |---|---|---|---|---|
-| P0 | #1 | Zod v4 API Breaking Change | Pending | 0.5d |
-| P0 | #2 | Missing `src/tools/` Directory | **Decision Needed** | 1–3d |
-| P0 | #3 | Mixed Module Syntax | Pending | 0.25d |
-| P0 | #4 | `resolveDependencies()` Order Bug | Pending | 0.5d |
+| P0 | #1 | Zod v4 API Breaking Change | Done | 0.5d |
+| P0 | #2 | Missing `src/tools/` Directory | Done (Option B) | 1–3d |
+| P0 | #3 | Mixed Module Syntax | Done | 0.25d |
+| P0 | #4 | `resolveDependencies()` Order Bug | Done | 0.5d |
 | P1 | #5 | Fabricated "66 Tools" Claim | Pending | 0.5d |
 | P1 | #6 | Unsubstantiated "Empirical Testing" | Pending | 0.25d |
 | P1 | #7 | Rate Limits Misframed as Constraints | Pending | 0.5d |
