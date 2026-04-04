@@ -1,4 +1,5 @@
 const axios = require("axios");
+const axiosRetry = require("axios-retry").default;
 require("dotenv").config();
 
 // Configuration
@@ -21,6 +22,25 @@ const apiClient = axios.create({
     Authorization: `Bearer ${FIREFLY_TOKEN}`,
     Accept: "application/json",
     "Content-Type": "application/json",
+  },
+});
+
+// Retry: exponential backoff for transient failures (429, 5xx, network errors)
+const RETRY_COUNT = 3;
+axiosRetry(apiClient, {
+  retries: RETRY_COUNT,
+  retryDelay: (retryCount, error) => {
+    const retryAfter = error.response?.headers?.['retry-after'];
+    if (retryAfter) {
+      const seconds = Number(retryAfter);
+      if (!Number.isNaN(seconds)) return seconds * 1000;
+    }
+    return axiosRetry.exponentialDelay(retryCount);
+  },
+  retryCondition: (error) => {
+    if (axiosRetry.isNetworkOrIdempotentRequestError(error)) return true;
+    const status = error.response?.status;
+    return status === 429 || (status >= 500 && status < 600);
   },
 });
 

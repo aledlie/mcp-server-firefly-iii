@@ -9,23 +9,6 @@ class FireflyError extends Error {
     this.name = 'FireflyError';
     this.code = code;
     this.context = context;
-    this.isRetryable = this.determineRetryability();
-    this.suggestedRetryDelay = this.determineSuggestedDelay();
-  }
-
-  determineRetryability() {
-    const retryableCodes = ['TIMEOUT', 'RATE_LIMITED', 'NETWORK', 'TEMP_UNAVAILABLE'];
-    return retryableCodes.includes(this.code);
-  }
-
-  determineSuggestedDelay() {
-    // Rate limit: exponential backoff
-    if (this.code === 'RATE_LIMITED') return 5000;
-    // Timeout: wait and retry
-    if (this.code === 'TIMEOUT') return 3000;
-    // Network: aggressive backoff
-    if (this.code === 'NETWORK') return 10000;
-    return null;
   }
 
   toJSON() {
@@ -33,8 +16,6 @@ class FireflyError extends Error {
       code: this.code,
       message: this.message,
       context: this.context,
-      isRetryable: this.isRetryable,
-      suggestedRetryDelayMs: this.suggestedRetryDelay,
       timestamp: new Date().toISOString(),
     };
   }
@@ -119,31 +100,8 @@ const formatErrorResponse = (error) => {
     response.context = fireflyError.context;
   }
 
-  if (fireflyError.isRetryable) {
-    response.retry = {
-      isRetryable: true,
-      suggestedDelayMs: fireflyError.suggestedRetryDelay,
-      guidance: getRetryGuidance(fireflyError.code),
-    };
-  }
-
   return response;
 };
-
-/**
- * Get Claude-friendly retry guidance
- */
-function getRetryGuidance(code) {
-  const guidance = {
-    RATE_LIMITED: 'Firefly III rate limit exceeded. Wait a few seconds before retrying.',
-    TIMEOUT: 'Request timed out. Firefly III may be slow. Retry with a shorter query.',
-    NETWORK: 'Network issue. Check your connection and Firefly III availability.',
-    TEMP_UNAVAILABLE: 'Firefly III temporarily unavailable. Retry in a moment.',
-    AUTHENTICATION_FAILED: 'Fix FIREFLY_URL and FIREFLY_TOKEN environment variables.',
-    NOT_FOUND: 'Resource does not exist. Verify the ID.',
-  };
-  return guidance[code] || 'An error occurred. Check the context for details.';
-}
 
 /**
  * Produce a fully-formed MCP CallToolResult for an error.
