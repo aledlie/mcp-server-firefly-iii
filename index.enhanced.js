@@ -34,6 +34,7 @@ const {
   validators,
   createValidatedHandler,
 } = require('./src/validation.js');
+const { rateLimited } = require('./src/rate-limiter.js');
 
 // Import tool registry (no side effects — no Server instantiation)
 const { TOOLS } = require('./src/tools/registry.js');
@@ -102,8 +103,8 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     const args = request.params.arguments || {};
 
-    // Call handler
-    const result = await tool._handler(args);
+    // Call handler through rate-limited queue
+    const result = await rateLimited(tool.name, () => tool._handler(args));
 
     // Estimate token cost for Claude awareness
     const estimatedTokens = estimateTokenCost(tool.name, args, 'default');
@@ -184,7 +185,7 @@ async function runServer() {
       app.all(`/api/${tool.name}`, async (req, res) => {
         try {
           const args = req.method === 'GET' ? req.query : req.body;
-          const result = await tool._handler(args);
+          const result = await rateLimited(tool.name, () => tool._handler(args));
           res.json({ data: result });
         } catch (error) {
           const formatted = formatErrorResponse(

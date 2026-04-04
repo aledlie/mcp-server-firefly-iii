@@ -9,6 +9,7 @@ const {
 const express = require("express");
 const { FIREFLY_URL, FIREFLY_TOKEN, PORT, apiClient } = require("./src/config.js");
 const { FireflyError, toMCPErrorResult, wrapFireflyError } = require("./src/errors.js");
+const { rateLimited } = require("./src/rate-limiter.js");
 
 // Import tool registry (no side effects — no Server instantiation)
 const { TOOLS } = require('./src/tools/registry.js');
@@ -35,7 +36,8 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   try {
-    const result = await tool.handler(request.params.arguments || {});
+    const args = request.params.arguments || {};
+    const result = await rateLimited(tool.name, () => tool.handler(args));
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   } catch (error) {
     return toMCPErrorResult(wrapFireflyError(error, { tool: request.params.name }));
@@ -79,7 +81,8 @@ async function runServer() {
     TOOLS.forEach(tool => {
       app.all(`/api/${tool.name}`, async (req, res) => {
         try {
-          const result = await tool.handler(req.method === 'GET' ? req.query : req.body);
+          const args = req.method === 'GET' ? req.query : req.body;
+          const result = await rateLimited(tool.name, () => tool.handler(args));
           res.json(result);
         } catch (e) {
           res.status(500).json({ error: e.message });
