@@ -1,8 +1,8 @@
 # Claude Ecosystem Integration — Implementation Status
 
-**Report Date:** April 2, 2026  
+**Report Date:** April 3, 2026  
 **Version:** 3.0.0  
-**Status:** Phase 1 Complete, Phase 2 Planned
+**Status:** Phase 1 Complete, Phase 2 In Progress
 
 ---
 
@@ -97,11 +97,11 @@ UNKNOWN_ERROR              other
 - 66 total tools in the server; 38 organized into 6 categories in toolGroups
 - Metadata coverage: 12/66 tools (18%) — remaining tools return null from getResourceHint() and 0 from estimateTokenCost()
 - Token cost estimation (heuristic — not empirically measured)
-- Cacheability matrix
-- Rate limit hints (operator-configurable defaults, not enforced by Firefly III)
+- Cacheability matrix — now backed by functional response caching via `src/response-cache.js` (lru-cache)
+- Rate limit hints (operator-configurable defaults) — now enforced at the tool level via `src/rate-limiter.js` (p-queue)
 - Tool categorization (6 categories)
 
-**Quality:** Partial metadata coverage. 12 core tools have verified entries; remaining 54 tools require Phase 2 metadata additions.
+**Quality:** Partial metadata coverage. 12 core tools have verified entries; remaining 54 tools require Phase 2 metadata additions. Caching and rate limiting are now functional (not just metadata hints).
 
 ---
 
@@ -148,7 +148,9 @@ Note: 66 total tools; 38 are categorized in toolGroups above; remainder are unca
 ---
 
 #### 6. Retry & Backoff Logic
-**Implementation:** `src/errors.js`
+**Implementation:** `src/errors.js` + `src/retry.js`
+
+Custom retry logic has been replaced with the `p-retry` library (`src/retry.js`, 66 lines). Error classification and suggested delays remain in `src/errors.js`.
 
 **Features:**
 ```javascript
@@ -173,6 +175,8 @@ FireflyError {
 | RATE_LIMITED | 5000ms | Firefly limit |
 | TIMEOUT | 3000ms | Server load |
 | NETWORK | 10000ms | Connection issue |
+
+**Dependencies:** `p-retry` (replaces previous custom retry + `axios-retry`)
 
 **Quality:** Production-ready. Prevents thrashing; respects API limits.
 
@@ -248,9 +252,9 @@ for await (const batch of paginator) {
 | No resource hints | Metadata per tool | ✅ Yes | Includes 6 categories |
 | No pagination | Pagination builders | ⏳ Deferred | Metadata guides usage |
 | No tool grouping | Tool categorization | ✅ Yes | Plus dependency resolver |
-| No caching hints | Cacheability metadata | ✅ Yes | Per-tool cache duration |
+| No caching hints | Cacheability metadata | ✅ Yes | Functional caching via lru-cache |
 | Weak schemas | Zod type safety | ✅ Yes | With JSON schema export |
-| No rate limiting | Metadata + guidance | ✅ Yes | Not enforced (by design) |
+| No rate limiting | Metadata + guidance | ✅ Yes | Enforced via p-queue per-tool limiter |
 
 **Summary:** 6/8 gaps fully closed; 1 partially addressed; 1 deferred with rationale.
 
@@ -274,18 +278,12 @@ if (meta.resultSize === 'large') {
 
 ---
 
-### 2. Rate Limiting Not Enforced
-**Limitation:** Metadata indicates limits, but server doesn't throttle.
+### 2. Rate Limiting
+**Status:** Now enforced at the tool level via `src/rate-limiter.js` using `p-queue` for per-tool concurrency control.
 
-**Rationale:** Enforcing rate limits would require state (counter per minute) and complicate deployment.
+**Previous limitation:** Metadata indicated limits but server didn't throttle.
 
-**Workaround:**
-```javascript
-// Claude respects retry guidance
-// Suggested delay prevents hammering
-```
-
-**Roadmap:** Optional middleware in v3.2 (single-instance only).
+**Current state:** Per-tool rate limiting is functional. Operator-configurable limits from resource metadata are respected at runtime.
 
 ---
 
@@ -318,7 +316,7 @@ account: z.object({
 
 ### Design Decisions (by choice)
 
-✖️ **Client-side caching** — Claude handles this; server provides metadata  
+✖️ **Client-side caching** — Claude handles this; server now provides functional response caching via lru-cache  
 ✖️ **GraphQL layer** — Would over-engineer; REST is sufficient  
 ✖️ **Database connection pooling** — Axios handles HTTP pooling  
 ✖️ **Observability hooks** — Use external APM (e.g., Sentry, DataDog)  
@@ -335,11 +333,12 @@ account: z.object({
 - [ ] Test with large datasets
 
 ### Priority 2: Rate Limiting Middleware
-- [ ] Optional in-memory counter (single-instance)
-- [ ] Configurable per-tool limits
+- [x] Per-tool rate limiting via `src/rate-limiter.js` (p-queue)
+- [x] Configurable per-tool limits (from resource metadata)
 - [ ] Metrics export
 
-### Priority 3: Cache Invalidation
+### Priority 3: Response Caching & Invalidation
+- [x] Response caching via `src/response-cache.js` (lru-cache)
 - [ ] Design invalidation rules per tool category
 - [ ] Webhook support for manual invalidation
 - [ ] Cache warming for critical tools
@@ -354,6 +353,8 @@ account: z.object({
 ## Testing Status
 
 ### Unit Tests
+**Runner:** vitest (`npm test` / `vitest run`) — 4 tests passing
+
 - ✅ Validation layer (Zod)
 - ✅ Error wrapping (FireflyError)
 - ⏳ Metadata functions (in progress)
@@ -367,7 +368,7 @@ account: z.object({
 - ⏳ With real Firefly instance
 - ⏳ Claude integration tests
 
-**Recommendation:** Add test suite in Phase 2 before GA release.
+**Note:** Jest has been replaced by vitest. The `test:enhanced` script has been removed; use `npm test` for all test runs.
 
 ---
 
@@ -377,7 +378,7 @@ account: z.object({
 - [x] Documentation complete
 - [x] Error handling comprehensive
 - [x] Resource metadata accurate
-- [ ] Unit tests passing (TODO)
+- [x] Unit tests passing (4 tests, vitest)
 - [ ] Integration tests passing (TODO)
 - [ ] Performance benchmarks (TODO)
 
@@ -421,12 +422,12 @@ account: z.object({
 - ✅ Tool organization & discovery
 - ✅ Comprehensive documentation
 
-**Next Phase:** Pagination builders, rate limiting middleware, cache invalidation (subject to user feedback).
+**Next Phase:** Pagination builders, rate limiting metrics export, cache invalidation rules (subject to user feedback). Rate limiting and response caching are now functional.
 
 **Quality:** Phase 1 P0 and P1 issues resolved (see BACKLOG.md). Two items deferred: #23 (upload_attachment multipart) and #29 (additionalProperties). No remaining blocking issues.
 
 ---
 
-**Document Version:** 1.1  
+**Document Version:** 1.2  
 **Last Updated:** April 3, 2026  
 **Maintained By:** Claude Code

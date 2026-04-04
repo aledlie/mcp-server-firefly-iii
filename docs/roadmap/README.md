@@ -48,7 +48,7 @@ Complete tracking of Claude ecosystem integration enhancements.
 | Phase | Status | Version | Date |
 |-------|--------|---------|------|
 | Phase 1 | Complete | 3.0.0 | 2026-04-02 |
-| Phase 2 | Planned | 3.1.0 | Q2 2026 (~3 weeks) |
+| Phase 2 | In Progress | 3.1.0 | Q2 2026 (~3 weeks) |
 | Phase 3+ | Future | 3.2.0+ | TBD |
 
 ---
@@ -81,16 +81,17 @@ Complete tracking of Claude ecosystem integration enhancements.
    - Async iterator + streaming support
    - Prevents timeouts & context truncation
 
-2. **Rate Limiting Middleware** (3 days)
-   - Optional in-memory throttling
+2. **Rate Limiting Middleware** (3 days) -- DONE
+   - In-memory throttling via p-queue
    - Per-tool limits + metrics export
    - Respects Firefly API constraints
 
 ### Secondary Priority
-3. **Cache Invalidation** (3 days)
-   - Per-category invalidation rules
-   - Optional webhook support
-   - Prevents stale data
+3. **Response Caching** (3 days) -- PARTIAL
+   - TTL-based caching via lru-cache
+   - Retry logic via p-retry
+   - Per-category invalidation rules: not started
+   - Optional webhook support: not started
 
 4. **Enhanced Examples** (3 days)
    - Schema examples in OpenAPI
@@ -108,29 +109,31 @@ Complete tracking of Claude ecosystem integration enhancements.
 
 ## Known Gaps
 
-### Currently Addressed ✅
-- ✅ Input validation
-- ✅ Error handling
-- ✅ Resource metadata
-- ✅ Tool organization
-- ✅ Documentation
+### Currently Addressed
+- [x] Input validation
+- [x] Error handling
+- [x] Resource metadata
+- [x] Tool organization
+- [x] Documentation
+- [x] Rate limiting (p-queue)
+- [~] Response caching (TTL-based via lru-cache; full invalidation not done)
+- [x] Retry logic (p-retry)
 
-### Phase 2 Roadmap 🔵
-- 🔵 Pagination
-- 🔵 Rate limiting
-- 🔵 Cache invalidation
-- 🔵 Schema examples
-- 🔵 Observability
+### Phase 2 Roadmap (remaining)
+- [ ] Pagination builders
+- [ ] Full cache invalidation (per-category rules, webhooks)
+- [ ] Schema examples
+- [ ] Observability
 
-### Future Consideration 🟢
-- 🟢 Distributed rate limiting (Redis)
-- 🟢 Streaming via SSE
-- 🟢 GraphQL query layer
-- 🟢 Request compression
-- 🟢 Batch operations (Firefly limitation)
-- 🟢 Webhooks (Firefly feature)
-- 🟢 Audit logging (external service)
-- 🟢 Multi-tenant support (architectural)
+### Future Consideration
+- [ ] Distributed rate limiting (Redis)
+- [ ] Streaming via SSE
+- [ ] GraphQL query layer
+- [ ] Request compression
+- [ ] Batch operations (Firefly limitation)
+- [ ] Webhooks (Firefly feature)
+- [ ] Audit logging (external service)
+- [ ] Multi-tenant support (architectural)
 
 **See [KNOWN_GAPS.md](./KNOWN_GAPS.md) for details.**
 
@@ -160,12 +163,20 @@ Complete tracking of Claude ecosystem integration enhancements.
 - 1 deferred (pagination)
 - 0 critical issues
 
+**Phase 2 Progress:**
+- Rate limiting: done (p-queue)
+- Response caching: partial (lru-cache, TTL-based only)
+- Retry logic: done (p-retry)
+- Pagination builders: not started
+- Observability: not started
+- Enhanced examples: not started
+
 **Code Quality:**
-- ✅ No breaking changes
-- ✅ Backward compatible
-- ✅ Type-safe (Zod)
-- ✅ Well-documented
-- ⏳ Tests pending (Phase 2)
+- [x] No breaking changes
+- [x] Backward compatible
+- [x] Type-safe (Zod)
+- [x] Well-documented
+- [x] 4 unit tests passing (vitest)
 
 ---
 
@@ -178,6 +189,6 @@ Complete tracking of Claude ecosystem integration enhancements.
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** April 2, 2026  
-**Next Review:** Q2 2026 (Phase 2 planning)
+**Document Version:** 1.1  
+**Last Updated:** April 3, 2026  
+**Next Review:** Q2 2026 (Phase 2 completion)

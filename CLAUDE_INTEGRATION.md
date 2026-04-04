@@ -22,21 +22,16 @@ const handler = createValidatedHandler(validators.account, async (args) => {
 
 ### 2. **Structured Error Handling** (`src/errors.js`)
 - Meaningful error codes (`RATE_LIMITED`, `TIMEOUT`, `AUTHENTICATION_FAILED`, etc.)
-- Automatic retry guidance with suggested delays
 - Context preservation without leaking sensitive data
 - Axios interceptor wrapper for Firefly API errors
+- Retries handled automatically at transport level via p-retry
 
 **Error Response Format:**
 ```json
 {
   "isError": true,
   "code": "RATE_LIMITED",
-  "message": "Rate limit exceeded",
-  "retry": {
-    "isRetryable": true,
-    "suggestedDelayMs": 5000,
-    "guidance": "Firefly III rate limit exceeded. Wait 5 seconds before retrying."
-  }
+  "message": "Rate limit exceeded"
 }
 ```
 
@@ -45,7 +40,7 @@ Per-tool metadata for Claude context awareness:
 - **estimatedTokens**: Approximate token cost
 - **cacheable**: Can Claude cache this result?
 - **cacheMaxAge**: How long is it valid (seconds)?
-- **rateLimit**: Rate limits per minute
+- **rateLimitHint**: Recommended rate limits per minute
 - **resultSize**: `minimal`, `small`, `medium`, `large`
 - **dependencies**: Other tools required first
 - **notes**: Usage guidance
@@ -56,7 +51,7 @@ get_net_worth_summary: {
   estimatedTokens: 500,
   cacheable: true,
   cacheMaxAge: 600, // 10 min
-  rateLimit: { perMinute: 10 },
+  rateLimitHint: { perMinute: 10 },
   resultSize: 'medium',
   notes: 'Computation-heavy; avoid frequent calls',
 }
@@ -162,11 +157,11 @@ const resolved = resolveDependencies(tools);
 
 ### Pattern 4: Rate Limit Awareness
 ```javascript
-// Check rate limits before batch operations
+// Rate limits are enforced automatically via p-queue.
+// Metadata indicates the configured limit:
 const hint = getResourceHint('create_transaction');
-// { rateLimit: { perMinute: 20 } }
-
-// Plan batch: max 20 creates per minute
+// { rateLimitHint: { perMinute: 20 } }
+// p-queue ensures max 20 calls per minute transparently.
 ```
 
 ## File Structure
@@ -175,13 +170,16 @@ const hint = getResourceHint('create_transaction');
 mcp-server/
 ├── index.enhanced.js          # Enhanced MCP server (ES modules)
 ├── src/
-│   ├── config.js              # (existing) Firefly config
-│   ├── validation.js           # NEW: Zod validators
-│   ├── errors.js               # NEW: Structured error handling
-│   ├── resource-metadata.js    # NEW: Tool metadata & hints
-│   └── tools/                  # (existing) Tool modules
+│   ├── config.js              # Firefly config
+│   ├── validation.js          # Zod validators
+│   ├── errors.js              # Structured error handling
+│   ├── resource-metadata.js   # Tool metadata & hints
+│   ├── rate-limiter.js        # Per-tool rate limiting (p-queue)
+│   ├── response-cache.js      # LRU response cache (lru-cache)
+│   ├── retry.js               # Automatic retry (p-retry)
+│   └── tools/                 # Tool modules (13 files)
 ├── CLAUDE_INTEGRATION.md       # This file
-└── package.json                # Added: zod, zod-to-json-schema
+└── package.json                # Added: zod, lru-cache, p-queue, p-retry
 ```
 
 ## Migration Path
@@ -202,7 +200,7 @@ try {
 } catch (error) {
   const formatted = formatErrorResponse(wrapFireflyError(error));
   console.log(formatted);
-  // { isError: true, code: '...', retry: {...} }
+  // { isError: true, code: '...', message: '...' }
 }
 ```
 
@@ -236,10 +234,10 @@ if (totalCost > 1000) {
 
 ### Rate Limiting
 ```javascript
-// Respect per-minute limits
+// Rate limits are enforced automatically via p-queue
 const meta = getResourceHint('create_transaction');
-// Can execute max 20 per minute
-// Space calls 3000ms apart for safety
+// rateLimitHint: { perMinute: 20 }
+// p-queue handles queuing and throttling transparently
 ```
 
 ### Caching
@@ -254,8 +252,8 @@ if (meta.cacheable) {
 
 ### "Rate limit exceeded"
 - Error code: `RATE_LIMITED`
-- Check metadata for `rateLimit.perMinute`
-- Use suggested `retryDelayMs` (usually 5000ms)
+- Check metadata for `rateLimitHint.perMinute`
+- Retries are automatic via p-retry at the transport level
 
 ### "Large responses"
 - Check `resultSize` in metadata

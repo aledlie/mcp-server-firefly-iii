@@ -2,7 +2,7 @@
 
 **Planned:** Q2 2026  
 **Target Version:** 3.2.0  
-**Status:** Planning phase
+**Status:** In progress — rate limiting and caching partially shipped
 
 ---
 
@@ -203,6 +203,8 @@ GET /api/list_transactions?limit=100&offset=0
 
 ## 2. Rate Limiting Middleware
 
+> **Status: Mostly Done** — Core per-tool rate limiting implemented in `src/rate-limiter.js` using p-queue with sliding window enforcement. Single-instance, in-memory. Remaining: HTTP response headers, metrics export, REST middleware wrapper.
+
 ### Problem
 Metadata indicates limits, but server doesn't enforce them. Claude might hammer API.
 
@@ -298,20 +300,22 @@ Retry-After: 60
 - **No persistence** — Use external storage for multi-instance
 
 ### Testing Strategy
-- [ ] Verify counter increments correctly
-- [ ] Test window reset
-- [ ] Concurrent requests
-- [ ] Header calculation
+- [x] Verify counter increments correctly
+- [x] Test window reset
+- [x] Concurrent requests
+- [ ] Header calculation (not yet implemented)
 
 ### Effort Estimate
 - Design: 1 day
 - Implementation: 1 day
 - Testing: 1 day
-- **Total: 3 days**
+- **Total: 3 days** (core complete; ~1 day remaining for headers/metrics/middleware)
 
 ---
 
 ## 3. Cache Invalidation
+
+> **Status: Partial** — TTL-based LRU response cache implemented in `src/response-cache.js` using lru-cache. Retry logic in `src/retry.js` via p-retry. Remaining: per-category invalidation rules, mutation-triggered invalidation, webhook support.
 
 ### Problem
 Metadata indicates what's cacheable, but no strategy for invalidation.
@@ -392,16 +396,16 @@ Clears cache for dependent queries
 ```
 
 ### Testing Strategy
-- [ ] Verify invalidation timing
-- [ ] Cache hit/miss rates
-- [ ] Memory usage
-- [ ] Concurrent invalidation
+- [x] Verify invalidation timing (TTL-based eviction tested)
+- [ ] Cache hit/miss rates (no metrics export yet)
+- [x] Memory usage (LRU eviction bounds memory)
+- [ ] Concurrent invalidation (mutation-triggered invalidation not implemented)
 
 ### Effort Estimate
 - Design: 1 day
-- Implementation: 1 day
+- Implementation: 1 day (TTL/LRU done; ~1.5 days remaining for category rules + webhooks)
 - Testing: 1 day
-- **Total: 3 days**
+- **Total: 3 days** (~1.5 days remaining)
 
 ---
 
@@ -557,13 +561,13 @@ cache_hits_total{tool="list_accounts"} 1200
 
 ## Summary
 
-| Feature | Effort | Priority | Depends On |
-|---------|--------|----------|-----------|
-| Pagination | 4 days | P0 | None |
-| Rate Limiting | 3 days | P1 | None |
-| Cache Invalidation | 3 days | P1 | Pagination (optional) |
-| Enhanced Examples | 3 days | P2 | Zod schemas |
-| Observability | 4 days | P2 | None |
+| Feature | Effort | Priority | Status | Depends On |
+|---------|--------|----------|--------|-----------|
+| Pagination | 4 days | P0 | Not Started | None |
+| Rate Limiting | 3 days | P1 | **Mostly Done** | None |
+| Cache Invalidation | 3 days | P1 | **Partial** | Pagination (optional) |
+| Enhanced Examples | 3 days | P2 | Not Started | Zod schemas |
+| Observability | 4 days | P2 | Not Started | None |
 
 **Total Phase 2 Effort:** ~17 days (3 weeks)
 
@@ -577,12 +581,12 @@ cache_hits_total{tool="list_accounts"} 1200
 ## Success Criteria
 
 - [ ] Pagination handles 100k+ record sets without token overflow
-- [ ] Rate limiter prevents abuse (< 1 request over limit in tests)
-- [ ] Cache invalidation accuracy > 99%
+- [x] Rate limiter prevents abuse (< 1 request over limit in tests) — p-queue sliding window enforced per tool
+- [ ] Cache invalidation accuracy > 99% (TTL eviction works; category/mutation rules pending)
 - [ ] Examples improve discoverability (survey Claude users)
 - [ ] Observability captures > 95% of errors
-- [ ] All tests passing
-- [ ] Performance benchmarks maintained (< 5% overhead)
+- [x] All tests passing (vitest)
+- [x] Performance benchmarks maintained (< 5% overhead)
 
 ---
 
@@ -596,4 +600,4 @@ cache_hits_total{tool="list_accounts"} 1200
 ---
 
 ## Document Version
-1.0 | April 2, 2026 | Planning phase
+1.1 | April 3, 2026 | Updated to reflect implemented rate limiting and caching

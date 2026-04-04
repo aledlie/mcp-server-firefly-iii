@@ -1,6 +1,6 @@
 # Known Gaps & Future Considerations
 
-**Document Date:** April 2, 2026  
+**Document Date:** April 3, 2026  
 **Status:** Living document — updated as gaps are discovered
 
 ---
@@ -27,38 +27,41 @@ if (meta.resultSize === 'large') {
 
 ---
 
-#### 2. Rate Limit Enforcement
-**Gap:** Metadata indicates limits (e.g., 10/min for `get_net_worth_summary`), but server doesn't throttle.
+#### 2. Rate Limit Enforcement — IMPLEMENTED
+**Gap:** ~~Metadata indicates limits (e.g., 10/min for `get_net_worth_summary`), but server doesn't throttle.~~
 
-**Current Behavior:**
-- Metadata warns of limits
-- Error codes + retry guidance provided
-- Claude respects suggested delays
+**Status:** Resolved. Per-tool rate limiting implemented in `src/rate-limiter.js` using p-queue with sliding window and tier-based queues. Retry logic in `src/retry.js` uses p-retry with exponential backoff, handling 429/5xx/network errors.
 
-**Current Workaround:** 
+**Implementation:**
 ```javascript
-// Manual spacing
-await sleep(suggestedRetryDelay);
-await tool.handler(args);
+// src/rate-limiter.js — per-tool sliding window via p-queue
+// src/retry.js — p-retry with exponential backoff on 429/5xx/network
+// Wraps tool handlers (client-side, not middleware)
 ```
 
-**Planned Solution:** Optional rate limiting middleware (Phase 2)  
+**Remaining Limitation:** Single-instance only; see Gap #4 for distributed (Redis) support.
+
+**Original Planned Solution:** ~~Optional rate limiting middleware (Phase 2)~~  
 **Effort:** 3 days  
-**Rationale:** Stateful throttling complicates distributed deployments
+**Completed:** April 2026
 
 ---
 
-#### 3. Cache Invalidation Strategy
-**Gap:** Metadata indicates what's cacheable, but no rules for when to invalidate.
+#### 3. Cache Invalidation Strategy — PARTIALLY ADDRESSED
+**Gap:** ~~Metadata indicates what's cacheable, but no rules for when to invalidate.~~
 
-**Current Workaround:**
+**Status:** Partially resolved. Response caching implemented in `src/response-cache.js` using lru-cache with per-tool TTLs derived from resourceMetadata. Smart per-category invalidation rules (e.g., invalidate account cache on transaction create) still planned.
+
+**Implementation:**
 ```javascript
-// Manual: cache invalidation TTLs only
-cache.set(key, result, 300000); // 5 min
+// src/response-cache.js — LRU cache with per-tool TTLs from resourceMetadata
+// Wraps tool handlers (client-side, not middleware)
 ```
 
-**Planned Solution:** Per-category invalidation rules (Phase 2)  
-**Effort:** 3 days  
+**Remaining Gap:** Per-category invalidation rules (e.g., write to accounts invalidates account-list cache).
+
+**Planned Solution:** Per-category invalidation rules (Phase 2, remaining work)  
+**Effort:** 1-2 days (reduced from 3; foundation in place)  
 **Blocked By:** None
 
 ---
@@ -81,7 +84,7 @@ cache.set(key, result, 300000); // 5 min
 
 **Planned Solution:** Redis-backed rate limiter (Phase 3)  
 **Effort:** 2 days  
-**Blocked By:** Rate limiting MVP (Phase 2)
+**Blocked By:** ~~Rate limiting MVP (Phase 2)~~ None (rate limiting implemented)
 
 ---
 
@@ -229,11 +232,8 @@ const limiter = createRateLimiter();
 
 ## Design Trade-Offs
 
-### Why No Client-Side Caching?
-Claude handles HTTP caching; server provides metadata. Avoids duplication.
-
-### Why No Rate Limiting in MVP?
-Stateful throttling complicates deployment. Metadata + error codes sufficient.
+### Why Client-Side Caching and Rate Limiting?
+Both response caching (`src/response-cache.js`) and rate limiting (`src/rate-limiter.js`) are implemented as client-side handler wrappers, not middleware. This keeps the server stateless for stdio mode and avoids coupling to a specific HTTP framework. Trade-off: single-instance only (no shared state across processes).
 
 ### Why No Streaming in MVP?
 Pagination builders achieve same benefit with simpler architecture. SSE adds complexity.
@@ -252,16 +252,16 @@ REST + dependency resolver sufficient. GraphQL adds query parsing overhead.
 **Status:** Tracked
 
 ### Risk 2: Rate Limit Hammering
-**Probability:** Medium  
+**Probability:** Low (mitigated)  
 **Impact:** API blocks requests  
-**Mitigation:** Error codes + retry guidance + Phase 2 enforcer  
-**Status:** Tracked
+**Mitigation:** Per-tool sliding window rate limiter (`src/rate-limiter.js`) + exponential backoff retry (`src/retry.js`). Handles 429/5xx/network errors automatically.  
+**Status:** Mitigated (single-instance). Distributed deployments still at risk (see Risk 4).
 
 ### Risk 3: Cache Staleness
-**Probability:** Medium  
+**Probability:** Low-Medium (partially mitigated)  
 **Impact:** Claude uses outdated data  
-**Mitigation:** Short TTLs + invalidation rules (Phase 2)  
-**Status:** Tracked
+**Mitigation:** LRU response cache (`src/response-cache.js`) with per-tool TTLs from resourceMetadata. Smart per-category invalidation rules still planned.  
+**Status:** Partially mitigated. TTL-based expiry in place; category-aware invalidation pending.
 
 ### Risk 4: Distributed Deployment Issues
 **Probability:** Medium (post-MVP)  
@@ -313,9 +313,9 @@ For reporting new gaps:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-04-02 | Initial gaps inventory |
-| TBD | TBD | Phase 2 validation |
+| 1.1 | 2026-04-03 | Updated gaps #2 (rate limiting implemented), #3 (caching partially addressed); risks 2-3 mitigated; design trade-offs revised; vitest replaces Jest |
 
 ---
 
-**Last Updated:** April 2, 2026  
+**Last Updated:** April 3, 2026  
 **Next Review:** After Phase 2 completion

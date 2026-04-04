@@ -101,7 +101,7 @@ Per-tool metadata for intelligent AI planning:
   estimatedTokens: 500,        // Token cost estimation
   cacheable: true,              // Can Claude cache result?
   cacheMaxAge: 600,             // Cache valid for 10 min
-  rateLimit: { perMinute: 10 }, // Rate limit
+  rateLimitHint: { perMinute: 10 }, // Rate limit hint
   resultSize: 'medium',         // Impact on context
   dependencies: ['list_accounts'],
   notes: 'Computation-heavy'
@@ -112,7 +112,7 @@ Per-tool metadata for intelligent AI planning:
 ```javascript
 // Get Claude-friendly hints
 getResourceHint('get_net_worth_summary');
-// → { estimatedTokens, cacheable, hints: ['⚠️ Token-heavy...'] }
+// → { estimatedTokens, cacheable, hints: ['Token-heavy...'] }
 
 // Estimate cost given input
 estimateTokenCost('list_transactions', { limit: 100 });
@@ -177,6 +177,19 @@ POST /api/{toolName}
 - `CLAUDE_INTEGRATION.md` — Usage guide
 - `ENHANCEMENTS.md` — This file
 - Updated README with enhancement notice
+
+### 6. Transport-Level Resilience
+
+Three modules provide production-grade request handling:
+
+#### Rate Limiter (`src/rate-limiter.js`)
+Per-tool rate limiting via **p-queue** with tier-based concurrency queues and sliding window enforcement. Tools are assigned rate tiers from resource metadata; requests exceeding the configured `rateLimitHint` are queued automatically.
+
+#### Response Cache (`src/response-cache.js`)
+LRU response cache using **lru-cache** with per-tool TTLs driven by resource metadata (`cacheMaxAge`). Only cacheable tools (as declared in metadata) are cached. Cache entries are keyed by tool name + serialized arguments.
+
+#### Retry (`src/retry.js`)
+Automatic retry via **p-retry** with exponential backoff. Retries 429 (rate limited), 5xx (server errors), and network failures. Respects `Retry-After` headers when present. Replaces the previous custom retry logic (`isRetryable`, `suggestedRetryDelay`) that was removed from `src/errors.js`.
 
 ## Implementation Details
 
@@ -293,17 +306,17 @@ Both versions work independently. Tools in original version still function but l
 - ✅ Detailed context for debugging (see logs, not API)
 
 ### Rate Limiting
-- ✅ Metadata warns about limits
+- ✅ Rate limits enforced via p-queue with per-tool sliding windows
 - ✅ Retry guidance prevents hammering
-- ✅ No automatic retry to respect Firefly's policies
+- ✅ Automatic retry via p-retry respects Retry-After headers
 
 ## Future Enhancements
 
-- [ ] Caching layer with automatic invalidation
+- [x] Caching layer with automatic invalidation (lru-cache)
 - [ ] Batch operation optimizer
 - [ ] Cost estimator with budget alerts
 - [ ] Observability hooks (metrics, traces)
-- [ ] Rate limiter middleware
+- [x] Rate limiter middleware (p-queue)
 - [ ] Request/response compression
 - [ ] GraphQL query layer
 
@@ -313,7 +326,7 @@ Both versions work independently. Tools in original version still function but l
 
 **Step 1:** Update dependencies
 ```bash
-npm install zod zod-to-json-schema
+npm install zod lru-cache p-queue p-retry
 ```
 
 **Step 2:** Add enhanced server
@@ -338,11 +351,8 @@ npm run start:enhanced
 ## Testing
 
 ```bash
-# Test original version
+# Run all tests (vitest)
 npm test
-
-# Test enhanced version (coming)
-npm run test:enhanced
 ```
 
 ## Questions?
