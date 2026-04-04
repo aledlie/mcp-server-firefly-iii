@@ -1,8 +1,8 @@
 # Backlog: mcp-server Enhancement Layer Issues
 
-**Report Date:** 2026-04-03  
-**Source:** Hallucination-checker + GenAI Quality Monitor  
-**Status:** Phase 1 complete — see summary table below for per-item status  
+**Report Date:** 2026-04-03 (updated 2026-04-03)  
+**Source:** Hallucination-checker + GenAI Quality Monitor + lib-audit  
+**Status:** Phase 1 complete; lib-audit in progress — see summary table below  
 
 ---
 
@@ -1050,6 +1050,165 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 
 ---
 
+## Library Audit Recommendations (2026-04-03)
+
+### Issue #35: Replace Express with Hono or built-in `node:http`
+
+**Files:** `index.js`, `index.enhanced.js`  
+**Severity:** LOW — Size/startup optimization  
+**Source:** lib-audit
+
+**Problem:**
+Express v5 (4.3MB installed) is heavyweight for ~6 routes with JSON body parsing and no middleware chain.
+
+**Recommendation:**
+Replace with `hono` + `@hono/node-server` (14KB, zero-dependency, type-safe), or use built-in `node:http` directly since routing is simple enough.
+
+```javascript
+const { Hono } = require('hono');
+const { serve } = require('@hono/node-server');
+const app = new Hono();
+app.get('/sse', (c) => { /* ... */ });
+app.post('/messages', (c) => { /* ... */ });
+serve({ fetch: app.fetch, port: PORT });
+```
+
+**Trade-off:** Express v5 is fine functionally — this is a size/startup time optimization. Skip if middleware-heavy features are planned.
+
+**Estimate:** 1-2 hours
+
+---
+
+### Issue #36: Add `lru-cache` for Response Caching
+
+**Files:** `src/resource-metadata.js`, `index.js`, `index.enhanced.js`  
+**Severity:** MEDIUM — Activates existing but non-functional cache metadata  
+**Source:** lib-audit  
+**Related:** IMPLEMENTATION_STATUS.md:343-345, ENHANCEMENTS.md:302
+
+**Problem:**
+`resourceMetadata` defines `cacheable` and `cacheMaxAge` per tool, but there is no actual cache. Three backlog items reference this gap. `lru-cache` is already a transitive dep via `path-scurry`.
+
+**Recommendation:**
+```javascript
+const { LRUCache } = require('lru-cache');
+const cache = new LRUCache({ max: 200, ttl: 300_000 });
+
+// In handler wrapper:
+const cacheKey = `${toolName}:${JSON.stringify(args)}`;
+const cached = cache.get(cacheKey);
+if (cached && meta.cacheable) return cached;
+const result = await handler(args);
+if (meta.cacheable) cache.set(cacheKey, result, { ttl: meta.cacheMaxAge * 1000 });
+```
+
+**Trade-off:** None — metadata already defines TTLs. This makes them functional. Closes 3+ backlog items with ~15 lines of code.
+
+**Estimate:** 30 minutes
+
+---
+
+### Issue #37: Replace Jest with Vitest
+
+**Files:** `package.json`, `index.test.js`, `jest.config.*`  
+**Severity:** LOW — DX improvement  
+**Source:** lib-audit
+
+**Problem:**
+Jest v30 (~40MB installed) is slow to start for CJS projects and requires config to handle ESM. The test suite is small (4 tests) and uses only basic `describe`/`test`/`expect`.
+
+**Recommendation:**
+Vitest is faster, has built-in mocking (can drop `axios-mock-adapter`), and is Jest-compatible:
+
+```json
+{
+  "scripts": { "test": "vitest run" },
+  "devDependencies": { "vitest": "^3.2.0" }
+}
+```
+
+**Trade-off:** Vitest uses ESM internally but supports CJS test files. Drop-in replacement for current test suite. Removes `axios-mock-adapter` dep if switching to `vi.mock`.
+
+**Estimate:** 20 minutes
+
+---
+
+### Issue #38: Add Pino for Structured Logging
+
+**Files:** `src/config.js:31`, `src/resource-metadata.js:191`, `index.enhanced.js:51`, `index.enhanced.js:270-272`  
+**Severity:** MEDIUM — Enables observability  
+**Source:** lib-audit  
+**Related:** ENHANCEMENTS.md:305
+
+**Problem:**
+All logging uses `console.error`/`console.warn` with no structure, no levels, and no way to filter. This blocks the observability Phase 2 items.
+
+**Recommendation:**
+```javascript
+const pino = require('pino');
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+logger.warn({ tool: toolName }, 'No metadata registered (Phase 2)');
+```
+
+Pino is the fastest Node.js logger, outputs JSON, and is <100KB.
+
+**Trade-off:** Adds a dependency. Payoff is structured logs that integrate with any log aggregator.
+
+**Estimate:** 45 minutes
+
+---
+
+### Issue #39: Replace Custom Retry/Backoff with `axios-retry`
+
+**Files:** `src/config.js`, `src/errors.js`  
+**Severity:** MEDIUM — Removes ~30 lines of custom code  
+**Source:** lib-audit
+
+**Problem:**
+`FireflyError` computed `isRetryable` and `suggestedRetryDelay` as advisory fields, but no code actually performed retries. Callers had to implement their own retry loops.
+
+**Solution:**
+Added `axios-retry` to `apiClient` in `src/config.js` with:
+- 3 retries with exponential backoff
+- `Retry-After` header support
+- Retry on: network errors, idempotent request errors, HTTP 429, HTTP 5xx
+
+Removed from `src/errors.js`:
+- `determineRetryability()`, `determineSuggestedDelay()`, `getRetryGuidance()`
+- `isRetryable`, `suggestedRetryDelay` fields from `FireflyError`
+- `retry` block from `formatErrorResponse()`
+
+**Status: Done** — commits `3452dd2`, `33cf725`
+
+**Estimate:** 15 minutes
+
+---
+
+### Issue #40: Add `p-queue` for Client-Side Rate Limiting
+
+**Files:** `src/rate-limiter.js` (new), `index.js`, `index.enhanced.js`  
+**Severity:** MEDIUM — Enforces previously advisory rate limits  
+**Source:** lib-audit  
+**Related:** PHASE_2_ROADMAP.md:301-304, ENHANCEMENTS.md:306
+
+**Problem:**
+`rateLimitHint.perMinute` values in `resourceMetadata` were advisory-only — nothing enforced them. Burst traffic could overwhelm a Firefly III instance.
+
+**Solution:**
+Added `src/rate-limiter.js` using `p-queue` v6 (CJS-compatible) with:
+- One queue per distinct `perMinute` tier (not per tool) for memory efficiency
+- Sliding-window token bucket via `intervalCap` + `interval`
+- Default 30/min for uncatalogued tools
+- Wired into MCP handlers and REST routes in both entry points
+
+Rate tiers: 100, 60, 40, 30 (default), 20, 15, 10 requests/minute.
+
+**Status: Done** — commits `abaa334`, `aa54be0`
+
+**Estimate:** 30 minutes
+
+---
+
 ## Summary Table (Updated)
 
 | Priority | ID | Title | Status | Est. | Source |
@@ -1088,14 +1247,20 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 | **P2** | #32 | Analytics count wrong (4 vs 3) | ✅ Done | 0.05d | Hallucination Check |
 | **P2** | #33 | Version 3.1.0 in roadmap files | ✅ Done | 0.05d | Hallucination Check |
 | **P3** | #34 | Emojis in README_CLAUDE.md | ✅ Done | 0.05d | Hallucination Check |
+| **P3** | #35 | Replace Express with Hono/node:http | Open | 1-2hr | lib-audit |
+| **P2** | #36 | Add `lru-cache` for Response Caching | Open | 0.5hr | lib-audit |
+| **P3** | #37 | Replace Jest with Vitest | Open | 0.3hr | lib-audit |
+| **P2** | #38 | Add Pino for Structured Logging | Open | 0.75hr | lib-audit |
+| **P2** | #39 | Replace Custom Retry with `axios-retry` | ✅ Done | 0.25hr | lib-audit |
+| **P2** | #40 | Add `p-queue` Rate Limiting | ✅ Done | 0.5hr | lib-audit |
 
 **Summary (Updated 2026-04-03):**
 - **P0 (Critical):** 11 issues — all Done
 - **P1 (High):** 9 issues — 8 Done, 1 Deferred (#23 — design decision)
-- **P2 (Medium):** 11 issues — 10 Done, 1 Deferred (#29 — Phase 2)
-- **P3 (Low):** 6 issues — all Done
+- **P2 (Medium):** 15 issues — 12 Done, 1 Deferred (#29 — Phase 2), 2 Open (#36, #38)
+- **P3 (Low):** 8 issues — 6 Done, 2 Open (#35, #37)
 
-**Remaining:** 0 outstanding (2 items deferred by design decision: #23, #29)
+**Remaining:** 4 open (lib-audit recommendations), 2 deferred by design decision (#23, #29)
 
 ---
 
@@ -1136,16 +1301,18 @@ Gate on `DEBUG` or `NODE_ENV !== 'production'`.
 
 ## Recommended Priority Order
 
-1. **CRITICAL FIRST:** Fix #15, #16, #17, #18, #19, #20, #21 (P0 blockers) — ~4 days
-2. **High Trust:** Fix #5–8, #22–25 (P1 correctness) — ~3.5 days
-3. **Quality:** Fix #9–12, #26–29 (P2 discoverability) — ~3 days
-4. **Polish:** Fix #13, #14, #30, #31 (P3) — ~0.5 days
+All P0-P3 issues from Phase 1 are resolved. Remaining work is lib-audit optimizations:
 
----
+1. **High value:** #36 `lru-cache` response caching (0.5hr) — activates existing metadata, closes 3+ related items
+2. **High value:** #38 Pino structured logging (0.75hr) — enables Phase 2 observability
+3. **Low priority:** #35 Replace Express with Hono (1-2hr) — size optimization only
+4. **Low priority:** #37 Replace Jest with Vitest (0.3hr) — DX improvement only
 
-## Next Steps
+**Completed this session:**
+- #39 `axios-retry` — transport-layer retry with exponential backoff (commits `3452dd2`, `33cf725`)
+- #40 `p-queue` — per-tool rate limiting enforcing `rateLimitHint` (commits `abaa334`, `aa54be0`)
 
-1. **Immediately:** Address P0 issues #15–21 (architectural/protocol fixes)
-2. **Then:** Address P1 issues #5–8, #22–25 (correctness and trust)
-3. **Then:** Address P2/P3 issues (documentation, quality, polish)
+**Deferred by design decision:**
+- #23 upload_attachment wrong API pattern (needs multipart design)
+- #29 No additionalProperties: false (Phase 2)
 
