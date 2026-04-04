@@ -1,3 +1,5 @@
+const { LRUCache } = require('lru-cache');
+
 /**
  * Resource metadata and hints for Claude ecosystem
  * Tracks token cost, cacheability, and rate limit hints per tool
@@ -176,8 +178,8 @@ function getResourceHint(toolName) {
   };
 }
 
-// Track tools with missing metadata to warn only once per tool per session
-const warnedMissingMetadata = new Set();
+// Bounded warn-once tracker: evicts after 200 entries (covers all 66 tools + headroom)
+const warnedMissingMetadata = new LRUCache({ max: 200 });
 
 /**
  * Calculate effective token cost with context
@@ -189,7 +191,7 @@ function estimateTokenCost(toolName, inputArgs = {}, resultSize = 'default') {
     // Warn only once per tool to avoid console spam on repeated calls
     if (!warnedMissingMetadata.has(toolName)) {
       console.warn(`[resource-metadata] No token estimate for tool: ${toolName} (Phase 2)`);
-      warnedMissingMetadata.add(toolName);
+      warnedMissingMetadata.set(toolName, true);
     }
     return 0;
   }

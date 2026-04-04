@@ -10,6 +10,8 @@ const express = require("express");
 const { FIREFLY_URL, FIREFLY_TOKEN, PORT, apiClient } = require("./src/config.js");
 const { FireflyError, toMCPErrorResult, wrapFireflyError } = require("./src/errors.js");
 const { rateLimited } = require("./src/rate-limiter.js");
+const responseCache = require("./src/response-cache.js");
+const { withRetry } = require("./src/retry.js");
 
 // Import tool registry (no side effects — no Server instantiation)
 const { TOOLS } = require('./src/tools/registry.js');
@@ -37,7 +39,15 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     const args = request.params.arguments || {};
-    const result = await rateLimited(tool.name, () => tool.handler(args));
+
+    const cached = responseCache.get(tool.name, args);
+    if (cached !== undefined) {
+      return { content: [{ type: "text", text: JSON.stringify(cached, null, 2) }] };
+    }
+
+    const result = await rateLimited(tool.name, () => withRetry(tool.name, () => tool.handler(args)));
+    responseCache.set(tool.name, args, result);
+    responseCache.invalidateAfterWrite(tool.name);
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   } catch (error) {
     return toMCPErrorResult(wrapFireflyError(error, { tool: request.params.name }));
@@ -82,7 +92,7 @@ async function runServer() {
       app.all(`/api/${tool.name}`, async (req, res) => {
         try {
           const args = req.method === 'GET' ? req.query : req.body;
-          const result = await rateLimited(tool.name, () => tool.handler(args));
+          const result = await rateLimited(tool.name, () => withRetry(tool.name, () => tool.handler(args)));
           res.json(result);
         } catch (e) {
           res.status(500).json({ error: e.message });

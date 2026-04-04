@@ -35,6 +35,8 @@ const {
   createValidatedHandler,
 } = require('./src/validation.js');
 const { rateLimited } = require('./src/rate-limiter.js');
+const responseCache = require('./src/response-cache.js');
+const { withRetry } = require('./src/retry.js');
 
 // Import tool registry (no side effects — no Server instantiation)
 const { TOOLS } = require('./src/tools/registry.js');
@@ -103,8 +105,29 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     const args = request.params.arguments || {};
 
+    // Check response cache first
+    const cached = responseCache.get(tool.name, args);
+    if (cached !== undefined) {
+      const estimatedTokens = estimateTokenCost(tool.name, args, 'default');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              { data: cached, _claude: { estimatedTokens, cached: true } },
+              null, 2
+            ),
+          },
+        ],
+      };
+    }
+
     // Call handler through rate-limited queue
-    const result = await rateLimited(tool.name, () => tool._handler(args));
+    const result = await rateLimited(tool.name, () => withRetry(tool.name, () => tool._handler(args)));
+
+    // Cache the response and invalidate stale reads after writes
+    responseCache.set(tool.name, args, result);
+    responseCache.invalidateAfterWrite(tool.name);
 
     // Estimate token cost for Claude awareness
     const estimatedTokens = estimateTokenCost(tool.name, args, 'default');
@@ -118,7 +141,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
               data: result,
               _claude: {
                 estimatedTokens,
-                cached: tool._resourceMetadata?.cacheable === true,
+                cached: false,
               },
             },
             null,
@@ -185,7 +208,7 @@ async function runServer() {
       app.all(`/api/${tool.name}`, async (req, res) => {
         try {
           const args = req.method === 'GET' ? req.query : req.body;
-          const result = await rateLimited(tool.name, () => tool._handler(args));
+          const result = await rateLimited(tool.name, () => withRetry(tool.name, () => tool._handler(args)));
           res.json({ data: result });
         } catch (error) {
           const formatted = formatErrorResponse(
@@ -255,6 +278,11 @@ async function runServer() {
           resourceMetadata: t._resourceMetadata,
         })),
       });
+    });
+
+    // Cache stats
+    app.get('/cache/stats', (req, res) => {
+      res.json(responseCache.stats());
     });
 
     // Dependency resolver
