@@ -2,7 +2,7 @@
 
 **Planned:** Q2 2026  
 **Target Version:** 3.2.0  
-**Status:** In progress — rate limiting and caching partially shipped
+**Status:** In progress — rate limiting done, caching done (PHP API), pagination partial (PHP API done, MCP handlers pending)
 
 ---
 
@@ -19,6 +19,8 @@ Phase 1 established the Claude ecosystem foundation. Phase 2 focuses on operatio
 ---
 
 ## 1. Pagination Builders
+
+> **Status: PHP API Done, MCP Server Pending** — The Firefly III PHP API now supports cursor pagination (`?cursor=`) on transaction endpoints and Spatie QueryBuilder (`?filter[]`, `?sort=`) on Account/Budget endpoints (April 2026). MCP server tool handlers still need to pass pagination params to the API.
 
 ### Problem
 Large responses (e.g., `get_spending_summary` over 12 months) can:
@@ -203,7 +205,7 @@ GET /api/list_transactions?limit=100&offset=0
 
 ## 2. Rate Limiting Middleware
 
-> **Status: Mostly Done** — Core per-tool rate limiting implemented in `src/rate-limiter.js` using p-queue with sliding window enforcement. Single-instance, in-memory. Remaining: HTTP response headers, metrics export, REST middleware wrapper.
+> **Status: Done** — MCP server: per-tool rate limiting in `src/rate-limiter.js` (p-queue, sliding window). PHP API (April 2026): 3-tier rate limiting (120/60/20 per min) via Laravel RateLimiter; `throttle` middleware automatically emits `X-RateLimit-*` and `Retry-After` headers. Remaining: metrics export only.
 
 ### Problem
 Metadata indicates limits, but server doesn't enforce them. Claude might hammer API.
@@ -315,7 +317,7 @@ Retry-After: 60
 
 ## 3. Cache Invalidation
 
-> **Status: Partial** — TTL-based LRU response cache implemented in `src/response-cache.js` using lru-cache. Retry logic in `src/retry.js` via p-retry. Remaining: per-category invalidation rules, mutation-triggered invalidation, webhook support.
+> **Status: Partial** — MCP server: TTL-based LRU response cache in `src/response-cache.js` (lru-cache). PHP API (April 2026): Redis default with tag-based invalidation via `TaggableCache` helper (tags: `config`, `preferences`, `exchange_rates`, `user:{id}`). Remaining: MCP per-category invalidation rules, mutation-triggered invalidation, webhook support.
 
 ### Problem
 Metadata indicates what's cacheable, but no strategy for invalidation.
@@ -563,9 +565,9 @@ cache_hits_total{tool="list_accounts"} 1200
 
 | Feature | Effort | Priority | Status | Depends On |
 |---------|--------|----------|--------|-----------|
-| Pagination | 4 days | P0 | Not Started | None |
-| Rate Limiting | 3 days | P1 | **Mostly Done** | None |
-| Cache Invalidation | 3 days | P1 | **Partial** | Pagination (optional) |
+| Pagination | 2 days remaining | P0 | **PHP API Done; MCP Pending** | None |
+| Rate Limiting | metrics only | P1 | **Done** (both layers) | None |
+| Cache Invalidation | 1.5 days remaining | P1 | **Partial** (PHP tags done; MCP rules pending) | None |
 | Enhanced Examples | 3 days | P2 | Not Started | Zod schemas |
 | Observability | 4 days | P2 | Not Started | None |
 
@@ -580,9 +582,9 @@ cache_hits_total{tool="list_accounts"} 1200
 
 ## Success Criteria
 
-- [ ] Pagination handles 100k+ record sets without token overflow
-- [x] Rate limiter prevents abuse (< 1 request over limit in tests) — p-queue sliding window enforced per tool
-- [ ] Cache invalidation accuracy > 99% (TTL eviction works; category/mutation rules pending)
+- [~] Pagination handles 100k+ record sets without token overflow (PHP API supports cursor; MCP handlers pending)
+- [x] Rate limiter prevents abuse — MCP: p-queue per-tool; PHP API: 3-tier throttle (120/60/20 per min)
+- [~] Cache invalidation accuracy > 99% (PHP API: Redis tag-based; MCP: TTL eviction; category/mutation rules pending)
 - [ ] Examples improve discoverability (survey Claude users)
 - [ ] Observability captures > 95% of errors
 - [x] All tests passing (vitest)
@@ -601,3 +603,4 @@ cache_hits_total{tool="list_accounts"} 1200
 
 ## Document Version
 1.1 | April 3, 2026 | Updated to reflect implemented rate limiting and caching
+1.2 | April 5, 2026 | PHP API: cursor pagination, Spatie QueryBuilder, Redis cache tags, 3-tier rate limiting

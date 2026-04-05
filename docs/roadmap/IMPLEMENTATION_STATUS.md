@@ -206,16 +206,21 @@ FireflyError {
 
 ---
 
-### ⏳ DEFERRED (Phase 2)
+### ⚠️ PARTIALLY IMPLEMENTED (Phase 2)
 
 #### 8. Pagination Builders
-**Status:** Designed but not implemented
+**Status:** PHP API support implemented; MCP server tool handlers not yet updated
 
-**Why Deferred:**
-1. **Complexity** — Requires per-tool pagination strategy
-2. **API Variance** — Firefly uses different pagination per endpoint
-3. **Low Immediate Impact** — Metadata hints are sufficient for MVP
-4. **User-Driven** — Wait for Claude feedback on pagination needs
+**PHP API (April 2026):**
+- ✅ Cursor pagination on transaction endpoints via `?cursor=` parameter
+- ✅ Spatie QueryBuilder on Account/Budget endpoints (`?filter[]`, `?sort=`)
+- ✅ Returns `meta.cursor_pagination` with `next_cursor`, `prev_cursor`, `has_more`
+- ✅ Backward compatible — omitting `?cursor=` uses existing offset pagination
+
+**MCP server (remaining work):**
+- ❌ Tool handlers in `src/tools/` don't yet pass `offset` or `cursor` to the API
+- ❌ `validators.listParams` schema not wired into tool schemas
+- ❌ Pagination iteration / streaming not implemented
 
 **Design Outline:**
 
@@ -327,19 +332,25 @@ account: z.object({
 ## Phase 2 Roadmap (Planned)
 
 ### Priority 1: Pagination Builders
-- [ ] Design pagination strategy per tool type
-- [ ] Implement cursor + offset builders
+- [x] PHP API: cursor pagination on transaction endpoints (`?cursor=`)
+- [x] PHP API: Spatie QueryBuilder on Account/Budget (`?filter[]`, `?sort=`)
+- [ ] MCP server: wire tool handlers to pass pagination params
+- [ ] MCP server: implement cursor + offset builders
 - [ ] Add streaming support
 - [ ] Test with large datasets
 
 ### Priority 2: Rate Limiting Middleware
-- [x] Per-tool rate limiting via `src/rate-limiter.js` (p-queue)
-- [x] Configurable per-tool limits (from resource metadata)
+- [x] MCP server: per-tool rate limiting via `src/rate-limiter.js` (p-queue)
+- [x] MCP server: configurable per-tool limits (from resource metadata)
+- [x] PHP API: 3-tier rate limiting (120/60/20 per min) via Laravel RateLimiter
+- [x] PHP API: Laravel's `throttle` middleware automatically emits `X-RateLimit-*` and `Retry-After` headers
 - [ ] Metrics export
 
 ### Priority 3: Response Caching & Invalidation
-- [x] Response caching via `src/response-cache.js` (lru-cache)
-- [ ] Design invalidation rules per tool category
+- [x] MCP server: response caching via `src/response-cache.js` (lru-cache)
+- [x] PHP API: Redis default cache driver with tag-based invalidation (`TaggableCache`)
+- [x] PHP API: domain-specific tags (`config`, `preferences`, `exchange_rates`, `user:{id}`)
+- [ ] MCP server: design invalidation rules per tool category
 - [ ] Webhook support for manual invalidation
 - [ ] Cache warming for critical tools
 
@@ -401,9 +412,9 @@ account: z.object({
 ## Questions & Next Steps
 
 ### Open Items
-1. **Should we enforce rate limits?** → Propose Phase 2 optional middleware
+1. ~~**Should we enforce rate limits?**~~ → ✅ Yes. PHP API enforces 3-tier rate limiting (120/60/20 per min). MCP server has client-side p-queue limiting.
 2. **Streaming support needed?** → Likely Phase 3; feedback from Claude usage will inform
-3. **Cache invalidation strategy?** → Depends on how Claude uses caching
+3. ~~**Cache invalidation strategy?**~~ → ✅ PHP API uses Redis with tag-based invalidation. MCP server uses TTL-based lru-cache. Per-category rules still planned.
 
 ### How to Contribute
 1. Open issues with feature requests
@@ -424,10 +435,10 @@ account: z.object({
 
 **Next Phase:** Pagination builders, rate limiting metrics export, cache invalidation rules (subject to user feedback). Rate limiting and response caching are now functional.
 
-**Quality:** Phase 1 P0 and P1 issues resolved (see BACKLOG.md). Two items deferred: #23 (upload_attachment multipart) and #29 (additionalProperties). No remaining blocking issues.
+**Quality:** Phase 1 P0 and P1 issues resolved (see BACKLOG.md). Two items deferred: #23 (upload_attachment multipart) and #29 (additionalProperties). PHP API now provides cursor pagination, Spatie QueryBuilder, Redis cache tags, and 3-tier rate limiting (April 2026). No remaining blocking issues.
 
 ---
 
-**Document Version:** 1.2  
-**Last Updated:** April 3, 2026  
+**Document Version:** 1.3  
+**Last Updated:** April 5, 2026  
 **Maintained By:** Claude Code

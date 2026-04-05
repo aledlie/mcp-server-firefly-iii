@@ -1,6 +1,8 @@
 # Testing Guide
 
-This project uses **Jest** for unit testing and **axios-mock-adapter** to simulate Firefly III API responses.
+This project uses **vitest** for unit testing and **axios-mock-adapter** to simulate Firefly III API responses.
+
+> **Note:** Jest was replaced by vitest. Run tests with `npm test` (which invokes `vitest run`).
 
 ## 🚀 Running Tests
 

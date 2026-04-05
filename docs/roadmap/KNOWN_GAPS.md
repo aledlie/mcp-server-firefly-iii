@@ -9,20 +9,22 @@
 
 ### High Priority (Phase 2)
 
-#### 1. Pagination for Large Result Sets
-**Gap:** Tools like `get_spending_summary` can return 100+ KB, exceeding token budgets.
+#### 1. Pagination for Large Result Sets — PARTIALLY ADDRESSED
+**Gap:** ~~Tools like `get_spending_summary` can return 100+ KB, exceeding token budgets.~~
 
-**Current Workaround:** 
-```javascript
-// Use metadata to guide filtering
-const meta = getResourceHint('get_spending_summary');
-if (meta.resultSize === 'large') {
-  // Claude can add filters or narrow date range
-}
-```
+**Status:** Partially resolved. The Firefly III PHP API now supports cursor-based pagination on transaction endpoints via `?cursor=` parameter (April 2026). The MCP server tool handlers do not yet pass cursor/offset params to the API — they only send `limit`.
 
-**Planned Solution:** Pagination builders (Phase 2)  
-**Effort:** 4 days  
+**PHP API support (implemented):**
+- `GET /api/v1/accounts/{id}/transactions?cursor=` — cursor pagination with `next_cursor`, `prev_cursor`
+- `GET /api/v1/accounts?filter[name]=...&sort=-name` — Spatie QueryBuilder filtering/sorting
+- Standard offset pagination (`?page=&limit=`) remains available on all list endpoints
+
+**Remaining MCP server work:**
+- Update tool handlers in `src/tools/` to pass `offset` or `cursor` params to the Firefly API
+- Wire up `validators.listParams` (already defined in `src/validation.js`) to tool schemas
+- Implement pagination iteration in tool responses for large result sets
+
+**Effort:** 2 days (reduced from 4; PHP API work is done)  
 **Blocked By:** None
 
 ---
@@ -30,16 +32,30 @@ if (meta.resultSize === 'large') {
 #### 2. Rate Limit Enforcement — IMPLEMENTED
 **Gap:** ~~Metadata indicates limits (e.g., 10/min for `get_net_worth_summary`), but server doesn't throttle.~~
 
-**Status:** Resolved. Per-tool rate limiting implemented in `src/rate-limiter.js` using p-queue with sliding window and tier-based queues. Retry logic in `src/retry.js` uses p-retry with exponential backoff, handling 429/5xx/network errors.
+**Status:** Resolved at both layers.
+
+**MCP server (client-side):** Per-tool rate limiting in `src/rate-limiter.js` using p-queue with sliding window and tier-based queues. Retry logic in `src/retry.js` uses p-retry with exponential backoff, handling 429/5xx/network errors.
+
+**Firefly III PHP API (server-side, April 2026):** 3-tier rate limiting via Laravel `RateLimiter` + `throttle` middleware:
+- `api-read`: 120 req/min (all GET endpoints)
+- `api-write`: 60 req/min (POST/PUT/DELETE — defined, ready for per-route use)
+- `api-analytics`: 20 req/min (chart, insight, summary endpoints)
+- Laravel's `throttle` middleware automatically emits `X-RateLimit-*` and `Retry-After` headers
+- Configurable via `API_RATE_LIMIT_*` env vars; scoped per user ID or IP
 
 **Implementation:**
 ```javascript
+// MCP server (client-side):
 // src/rate-limiter.js — per-tool sliding window via p-queue
 // src/retry.js — p-retry with exponential backoff on 429/5xx/network
-// Wraps tool handlers (client-side, not middleware)
+
+// PHP API (server-side):
+// app/Providers/AppServiceProvider.php — RateLimiter::for() definitions
+// bootstrap/app.php — throttle:api-read in api middleware group
+// routes/api.php — throttle:api-analytics on chart/insight/summary groups
 ```
 
-**Remaining Limitation:** Single-instance only; see Gap #4 for distributed (Redis) support.
+**Remaining Limitation:** MCP server rate limiting is single-instance only; see Gap #4 for distributed (Redis) support.
 
 **Original Planned Solution:** ~~Optional rate limiting middleware (Phase 2)~~  
 **Effort:** 3 days  
@@ -50,7 +66,11 @@ if (meta.resultSize === 'large') {
 #### 3. Cache Invalidation Strategy — PARTIALLY ADDRESSED
 **Gap:** ~~Metadata indicates what's cacheable, but no rules for when to invalidate.~~
 
-**Status:** Partially resolved. Response caching implemented in `src/response-cache.js` using lru-cache with per-tool TTLs derived from resourceMetadata. Smart per-category invalidation rules (e.g., invalidate account cache on transaction create) still planned.
+**Status:** Partially resolved at both layers.
+
+**MCP server:** Response caching in `src/response-cache.js` using lru-cache with per-tool TTLs from resourceMetadata. Smart per-category invalidation rules (e.g., invalidate account cache on transaction create) still planned.
+
+**Firefly III PHP API (April 2026):** Redis cache with tag-based invalidation via `TaggableCache` helper. Tags: `config`, `preferences`, `exchange_rates`, `user:{id}`. Exchange rate changes flush only the `exchange_rates` tag instead of the entire cache. Graceful fallback to untagged cache when using file driver.
 
 **Implementation:**
 ```javascript
@@ -314,8 +334,9 @@ For reporting new gaps:
 |---------|------|---------|
 | 1.0 | 2026-04-02 | Initial gaps inventory |
 | 1.1 | 2026-04-03 | Updated gaps #2 (rate limiting implemented), #3 (caching partially addressed); risks 2-3 mitigated; design trade-offs revised; vitest replaces Jest |
+| 1.2 | 2026-04-05 | Gap #1 partially addressed (PHP API cursor pagination). Gap #2 updated with PHP API 3-tier rate limiting. Gap #3 updated with PHP API Redis tag-based cache |
 
 ---
 
-**Last Updated:** April 3, 2026  
+**Last Updated:** April 5, 2026  
 **Next Review:** After Phase 2 completion

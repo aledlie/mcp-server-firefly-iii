@@ -76,15 +76,15 @@ Complete tracking of Claude ecosystem integration enhancements.
 ## Phase 2 Overview (Planned)
 
 ### Top Priority
-1. **Pagination Builders** (4 days)
-   - Handle large result sets without token overflow
-   - Async iterator + streaming support
-   - Prevents timeouts & context truncation
+1. **Pagination Builders** (2 days remaining) -- PARTIAL
+   - PHP API now supports cursor pagination (`?cursor=`) and Spatie QueryBuilder (`?filter[]`, `?sort=`)
+   - MCP server tool handlers still need to pass pagination params to the API
+   - Async iterator + streaming support: not started
 
 2. **Rate Limiting Middleware** (3 days) -- DONE
-   - In-memory throttling via p-queue
-   - Per-tool limits + metrics export
-   - Respects Firefly API constraints
+   - MCP server: in-memory throttling via p-queue
+   - PHP API: 3-tier throttle (120/60/20 per min) via Laravel RateLimiter
+   - Laravel's `throttle` middleware automatically emits `X-RateLimit-*` and `Retry-After` headers
 
 ### Secondary Priority
 3. **Response Caching** (3 days) -- PARTIAL
@@ -120,8 +120,8 @@ Complete tracking of Claude ecosystem integration enhancements.
 - [x] Retry logic (p-retry)
 
 ### Phase 2 Roadmap (remaining)
-- [ ] Pagination builders
-- [ ] Full cache invalidation (per-category rules, webhooks)
+- [~] Pagination builders (PHP API done; MCP server tool handlers need update)
+- [~] Full cache invalidation (PHP API has Redis tags; MCP per-category rules pending)
 - [ ] Schema examples
 - [ ] Observability
 
@@ -164,10 +164,10 @@ Complete tracking of Claude ecosystem integration enhancements.
 - 0 critical issues
 
 **Phase 2 Progress:**
-- Rate limiting: done (p-queue)
-- Response caching: partial (lru-cache, TTL-based only)
+- Rate limiting: done (MCP: p-queue + PHP API: 3-tier throttle)
+- Response caching: partial (MCP: lru-cache TTL; PHP API: Redis with tag-based invalidation)
 - Retry logic: done (p-retry)
-- Pagination builders: not started
+- Pagination builders: partial (PHP API: cursor pagination + QueryBuilder; MCP tool handlers: not started)
 - Observability: not started
 - Enhanced examples: not started
 
@@ -189,6 +189,6 @@ Complete tracking of Claude ecosystem integration enhancements.
 
 ---
 
-**Document Version:** 1.1  
-**Last Updated:** April 3, 2026  
+**Document Version:** 1.2  
+**Last Updated:** April 5, 2026  
 **Next Review:** Q2 2026 (Phase 2 completion)
