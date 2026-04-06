@@ -62,16 +62,10 @@ catch (error) {
   // "Request failed with status code 429" — unhelpful
 }
 
-// After: Actionable error
+// After: Actionable error (unified via toMCPErrorResult)
 catch (error) {
-  return formatErrorResponse(wrapFireflyError(error));
-  // {
-  //   code: "RATE_LIMITED",
-  //   message: "Rate limit exceeded",
-  //   isRetryable: true,
-  //   suggestedDelayMs: 5000,
-  //   guidance: "Wait before retrying"
-  // }
+  return toMCPErrorResult(wrapFireflyError(error));
+  // { content: [{ type: 'text', text: '...' }], isError: true }
 }
 ```
 
@@ -138,7 +132,7 @@ getToolsByCategory('analytics');
 ### 4. Enhanced MCP Server
 **File:** `index.enhanced.js`
 
-ES modules + metadata integration:
+CommonJS modules + metadata integration:
 
 ```bash
 # Run with metadata enhancements
@@ -241,7 +235,7 @@ try {
     const wrapped = wrapFireflyError(error, { tool: 'example' });
   }
   
-  return formatErrorResponse(wrapped);
+  return toMCPErrorResult(wrapped);
 }
 ```
 
@@ -257,7 +251,7 @@ if (meta.estimatedTokens > remainingBudget) {
 }
 
 // Respect rate limits
-if (meta.rateLimit.perMinute < 20) {
+if (meta.rateLimitHint.perMinute < 20) {
   // Throttle batch operations
 }
 

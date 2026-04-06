@@ -238,20 +238,34 @@ Test runner: vitest. Mock adapter: axios-mock-adapter.
 | [docs/roadmap/](docs/roadmap/) | Implementation status, Phase 2 roadmap, known gaps |
 | [docs/BACKLOG.md](docs/BACKLOG.md) | Issue tracker with status |
 
+## Firefly III PHP API Enhancements (Parent Repo)
+
+The MCP server communicates with the Firefly III PHP API, which has these recent enhancements (April 2026):
+
+| Feature | Details |
+|---------|---------|
+| **Rate Limiting** | 3-tier: `api-read` (120/min), `api-write` (60/min), `api-analytics` (20/min); env-configurable |
+| **Cache** | Redis default with tag-based invalidation (`config`, `preferences`, `exchange_rates`, `user:{id}`) |
+| **Cursor Pagination** | `?cursor=` on transaction endpoints; returns `next_cursor`/`prev_cursor` |
+| **QueryBuilder** | `?filter[name]=`, `?filter[active]=`, `?sort=` on Account/Budget list endpoints |
+
+MCP server tool handlers don't yet pass cursor/filter params to the API — this is tracked for Phase 2.
+
 ## Current Status
 
 **Phase 1:** Complete -- validation, errors, metadata, tool organization, documentation
-**Phase 2:** In progress -- rate limiting (done), caching (done), retry (done), pagination (planned), observability (planned)
+**Phase 2:** In progress -- rate limiting (done), caching (done), retry (done), pagination (PHP API done, MCP handlers pending), observability (planned)
 
 ### Open Items
-- Pagination builders for large result sets
-- Structured logging (Pino)
+- MCP tool handlers: wire pagination params (cursor, filter, sort) to API
+- Structured logging (Pino) — [Backlog #38](docs/BACKLOG.md)
 - Per-category cache invalidation rules
 - Observability (OTEL, health checks, metrics)
 - Enhanced schema examples
+- Replace Express with Hono or `node:http` — [Backlog #35](docs/BACKLOG.md)
 
 See [docs/BACKLOG.md](docs/BACKLOG.md) for the full tracked list.
 
 ---
 
-**Last Updated:** April 3, 2026
+**Last Updated:** April 5, 2026

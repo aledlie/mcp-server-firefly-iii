@@ -1,6 +1,7 @@
 # Claude Ecosystem Integration Guide
 
-Enhanced Firefly III MCP Server with native Claude support.
+Enhanced Firefly III MCP Server (v3.0.0) with native Claude support.
+66 tools across 12 modules; 16 with full resource metadata.
 
 ## Features
 
@@ -9,6 +10,7 @@ Enhanced Firefly III MCP Server with native Claude support.
 - Auto-generated JSON schemas for MCP/OpenAPI
 - Reusable validators (date ranges, accounts, transactions, etc.)
 - `ValidationError` class with structured field-level feedback
+- Note: `accountRole` enum is a known incomplete subset
 
 **Usage:**
 ```javascript
@@ -22,28 +24,43 @@ const handler = createValidatedHandler(validators.account, async (args) => {
 
 ### 2. **Structured Error Handling** (`src/errors.js`)
 - Meaningful error codes (`RATE_LIMITED`, `TIMEOUT`, `AUTHENTICATION_FAILED`, etc.)
+- Unified error surface via `toMCPErrorResult()` — wraps errors into valid `CallToolResult`
+- Both `index.js` and `index.enhanced.js` use the same error path
+- Tool-not-found returns a graceful MCP error result (not an exception) with available tools list
 - Context preservation without leaking sensitive data
 - Axios interceptor wrapper for Firefly API errors
 - Retries handled automatically at transport level via p-retry
 
-**Error Response Format:**
+**Error Response Format (via `toMCPErrorResult()`):**
 ```json
 {
-  "isError": true,
-  "code": "RATE_LIMITED",
-  "message": "Rate limit exceeded"
+  "content": [{ "type": "text", "text": "..." }],
+  "isError": true
 }
 ```
 
+**Exported API:**
+```javascript
+const {
+  FireflyError,
+  wrapFireflyError,
+  formatErrorResponse,
+  toMCPErrorResult,
+  createErrorInterceptor,
+} = require('./src/errors.js');
+```
+
 ### 3. **Resource Metadata** (`src/resource-metadata.js`)
-Per-tool metadata for Claude context awareness:
-- **estimatedTokens**: Approximate token cost
+Per-tool metadata for Claude context awareness (16/66 tools catalogued):
+- **estimatedTokens**: Approximate token cost (returns 0 for uncatalogued tools)
 - **cacheable**: Can Claude cache this result?
 - **cacheMaxAge**: How long is it valid (seconds)?
-- **rateLimitHint**: Recommended rate limits per minute
+- **rateLimitHint**: Recommended rate limits per minute (operator-configurable defaults, not enforced API constraints)
 - **resultSize**: `minimal`, `small`, `medium`, `large`
 - **dependencies**: Other tools required first
 - **notes**: Usage guidance
+
+Missing metadata warnings are logged once per tool per session (warn-once via Set).
 
 **Example Metadata:**
 ```javascript
@@ -59,11 +76,19 @@ get_net_worth_summary: {
 
 **API Functions:**
 ```javascript
+const {
+  getResourceHint,
+  estimateTokenCost,
+  resolveDependencies,
+  getToolsByCategory,
+  getToolCategory,
+} = require('./src/resource-metadata.js');
+
 // Get hints for a tool
 const hint = getResourceHint('get_net_worth_summary');
 // { name, estimatedTokens, cacheable, hints: [...] }
 
-// Estimate cost given input
+// Estimate cost given input (warns to stderr for uncatalogued tools)
 const cost = estimateTokenCost('list_transactions', { limit: 100 });
 
 // Resolve dependencies
@@ -76,25 +101,45 @@ getToolsByCategory('budgets');
 ```
 
 ### 4. **Tool Grouping** (`src/resource-metadata.js`)
-Tools organized by domain:
+66 tools organized by domain across 12 modules:
 - **transactions**: CRUD + search operations
 - **accounts**: Account management
 - **budgets**: Budget and limit operations
 - **analytics**: Reporting and insights (high-token)
-- **automation**: Rules, webhooks
+- **automation**: Rules, webhooks (10 tools)
 - **system**: Metadata operations
+- **bills**, **groups**, **recurring**, **admin**, **insights**, **meta**
 
 Use for context switching or workflow planning.
+
+### 5. **Response Caching** (`src/response-cache.js`)
+- LRU response cache via `lru-cache`
+- Caches repeated queries to reduce API calls
+
+### 6. **Rate Limiting** (`src/rate-limiter.js`)
+- Per-tool client-side rate limiting via `p-queue`
+- Limits align with `rateLimitHint` values in resource metadata
+
+### 7. **Retry Logic** (`src/retry.js`)
+- Automatic retry with exponential backoff via `p-retry`
+- Handles 429 (rate limited) and 5xx (server error) responses
+
+### 8. **SSE Session Management**
+- Session-keyed Map prevents connection overwrites
+- Cleanup handlers on both `close` and `error` events
+- Failed `mcpServer.connect()` calls caught; sessions cleaned up in `finally` block
 
 ## Integration Points
 
 ### Enhanced Index (`index.enhanced.js`)
-- ES module syntax (modern Node.js)
+- CommonJS modules (all `require()`, not ESM)
 - Enriched tool metadata in responses
 - Token cost estimation in every call
-- Improved error formatting
+- Unified error formatting via `toMCPErrorResult()`
 - Tool dependency resolver endpoint
 - Metadata endpoint for Claude discovery
+- Warning log when `enrichToolMetadata` encounters unregistered tool (null metadata)
+- Note: `require('./index.js')` triggers upstream Server initialization as a side-effect
 
 ### REST API Endpoints
 
@@ -157,8 +202,8 @@ const resolved = resolveDependencies(tools);
 
 ### Pattern 4: Rate Limit Awareness
 ```javascript
-// Rate limits are enforced automatically via p-queue.
-// Metadata indicates the configured limit:
+// Client-side rate limits are enforced automatically via p-queue.
+// rateLimitHint values are operator-configurable defaults, not enforced API constraints.
 const hint = getResourceHint('create_transaction');
 // { rateLimitHint: { perMinute: 20 } }
 // p-queue ensures max 20 calls per minute transparently.
@@ -168,18 +213,32 @@ const hint = getResourceHint('create_transaction');
 
 ```
 mcp-server/
-├── index.enhanced.js          # Enhanced MCP server (ES modules)
+├── index.js                   # Upstream MCP server entry point
+├── index.enhanced.js          # Enhanced MCP server (CommonJS)
 ├── src/
-│   ├── config.js              # Firefly config
+│   ├── config.js              # Firefly config (DEBUG/NODE_ENV gated logging)
 │   ├── validation.js          # Zod validators
-│   ├── errors.js              # Structured error handling
-│   ├── resource-metadata.js   # Tool metadata & hints
+│   ├── errors.js              # Structured errors + toMCPErrorResult()
+│   ├── resource-metadata.js   # Tool metadata & hints (16/66 catalogued)
 │   ├── rate-limiter.js        # Per-tool rate limiting (p-queue)
 │   ├── response-cache.js      # LRU response cache (lru-cache)
-│   ├── retry.js               # Automatic retry (p-retry)
+│   ├── retry.js               # Automatic retry with backoff (p-retry)
 │   └── tools/                 # Tool modules (13 files)
+│       ├── registry.js        # Central tool registry (no side effects)
+│       ├── accounts.js
+│       ├── admin.js
+│       ├── automation.js
+│       ├── bills.js
+│       ├── budgets.js
+│       ├── core.js
+│       ├── groups.js
+│       ├── insights.js
+│       ├── meta.js
+│       ├── recurring.js
+│       ├── system.js
+│       └── transactions.js
 ├── CLAUDE_INTEGRATION.md       # This file
-└── package.json                # Added: zod, lru-cache, p-queue, p-retry
+└── package.json                # Deps: zod, lru-cache, p-queue, p-retry
 ```
 
 ## Migration Path
@@ -192,15 +251,14 @@ mcp-server/
 
 ### For Custom Integrations
 ```javascript
-const { formatErrorResponse, wrapFireflyError } = require('./src/errors.js');
+const { toMCPErrorResult, wrapFireflyError } = require('./src/errors.js');
 const { getResourceHint, estimateTokenCost } = require('./src/resource-metadata.js');
 
 try {
   const result = await tool.handler(args);
 } catch (error) {
-  const formatted = formatErrorResponse(wrapFireflyError(error));
-  console.log(formatted);
-  // { isError: true, code: '...', message: '...' }
+  const mcpResult = toMCPErrorResult(wrapFireflyError(error));
+  // { content: [{ type: 'text', text: '...' }], isError: true }
 }
 ```
 
@@ -224,7 +282,7 @@ try {
 
 ### Token Budget
 ```javascript
-// Estimate and plan
+// Estimate and plan (returns 0 for uncatalogued tools — 50/66 have no metadata yet)
 const tools = ['list_transactions', 'get_spending_summary'];
 const totalCost = tools.reduce((sum, t) => sum + estimateTokenCost(t), 0);
 if (totalCost > 1000) {
@@ -234,7 +292,8 @@ if (totalCost > 1000) {
 
 ### Rate Limiting
 ```javascript
-// Rate limits are enforced automatically via p-queue
+// Client-side rate limits enforced via p-queue
+// rateLimitHint values are operator-configurable, not enforced API constraints
 const meta = getResourceHint('create_transaction');
 // rateLimitHint: { perMinute: 20 }
 // p-queue handles queuing and throttling transparently
@@ -265,7 +324,17 @@ if (meta.cacheable) {
 - Narrow time ranges or add filters
 - Use cheaper alternative if available
 
+### "Tool not found"
+- Returns graceful MCP error result (not exception)
+- Response includes list of available tools for discovery
+- Check tool name spelling and registry
+
 ### "Missing dependencies"
 - Tool requires other tools first
 - Call `resolveDependencies()` to get execution order
 - Example: updating transaction requires fetching it first
+
+### "Missing metadata warning"
+- `estimateTokenCost()` warns to stderr for uncatalogued tools (once per tool per session)
+- Returns 0 — treat as unknown cost, not free
+- 50/66 tools still need metadata entries (tracked in Phase 2 roadmap)
