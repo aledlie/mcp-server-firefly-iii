@@ -2,13 +2,13 @@
 
 **Report Date:** April 3, 2026  
 **Version:** 3.0.0  
-**Status:** Phase 1 Complete, Phase 2 In Progress
+**Status:** Phase 1 Complete, Phase 2 Complete
 
 ---
 
 ## Executive Summary
 
-**8 proposed improvements identified.** 6 fully implemented, 1 partially implemented, 1 deferred to Phase 2.
+**8 proposed improvements identified.** 7 fully implemented, 1 partially implemented.
 
 | Item | Status | Priority | Notes |
 |------|--------|----------|-------|
@@ -16,10 +16,10 @@
 | Error Handling | ✅ Done | P0 | Structured errors with retry guidance |
 | Resource Hints | ✅ Done | P0 | Token cost, cacheability, rate limits |
 | Tool Organization | ✅ Done | P1 | 6 categories + dependency resolver |
-| Enhanced Schemas | ⚠️ Partial | P1 | Zod provides type safety; docs added |
-| Pagination Builders | ⏳ Deferred | P2 | Design in progress |
+| Enhanced Schemas | ⚠️ Partial | P1 | Zod provides type safety; per-field examples deferred |
+| Pagination | ✅ Done | P0 | Cursor/offset in all list tools + PHP API |
 | Claude Documentation | ✅ Done | P0 | 3 comprehensive guides |
-| Retry & Backoff | ✅ Done | P0 | Error codes + suggested delays |
+| Retry & Backoff | ✅ Done | P0 | p-retry with exponential backoff |
 
 ---
 
@@ -150,7 +150,7 @@ Note: 66 total tools; 38 are categorized in toolGroups above; remainder are unca
 #### 6. Retry & Backoff Logic
 **Implementation:** `src/errors.js` + `src/retry.js`
 
-Custom retry logic has been replaced with the `p-retry` library (`src/retry.js`, 66 lines). Error classification and suggested delays remain in `src/errors.js`.
+Custom retry logic has been replaced with the `p-retry` library (`src/retry.js`). Error classification and suggested delays remain in `src/errors.js`.
 
 **Features:**
 ```javascript
@@ -206,180 +206,55 @@ FireflyError {
 
 ---
 
-### ⚠️ PARTIALLY IMPLEMENTED (Phase 2)
+### ✅ COMPLETED (Phase 2)
 
-#### 8. Pagination Builders
-**Status:** PHP API support implemented; MCP server tool handlers not yet updated
+Full details in [`docs/changelog/CHANGELOG.md`](../changelog/CHANGELOG.md).
 
-**PHP API (April 2026):**
-- ✅ Cursor pagination on transaction endpoints via `?cursor=` parameter
-- ✅ Spatie QueryBuilder on Account/Budget endpoints (`?filter[]`, `?sort=`)
-- ✅ Returns `meta.cursor_pagination` with `next_cursor`, `prev_cursor`, `has_more`
-- ✅ Backward compatible — omitting `?cursor=` uses existing offset pagination
-
-**MCP server (remaining work):**
-- ❌ Tool handlers in `src/tools/` don't yet pass `offset` or `cursor` to the API
-- ❌ `validators.listParams` schema not wired into tool schemas
-- ❌ Pagination iteration / streaming not implemented
-
-**Design Outline:**
-
-```javascript
-// Proposed pagination builder
-const paginator = createPaginator('list_transactions', {
-  pageSize: 100,
-  maxResults: 1000,
-  onPage: (items) => console.log(`Got ${items.length} items`)
-});
-
-for await (const batch of paginator) {
-  // Handle batch
-}
-```
-
-**Scope for Phase 2:**
-- Tools: `list_transactions`, `list_accounts`, `list_budgets`
-- Features: Cursor-based + offset-based pagination
-- Helpers: Streaming, batching, deduplication
-
-**Estimated Effort:** 2–3 days implementation + testing
+| # | Item | Key Files |
+|---|------|-----------|
+| 8 | Cursor/offset pagination in all list tools | `src/pagination.js`, `src/tools/*.js`, `src/validation.js` |
+| 9 | Per-tool rate limiting (fixed-window) + retry | `src/rate-limiter.js`, `src/retry.js` |
+| 10 | LRU cache with per-category write invalidation | `src/response-cache.js` |
 
 ---
 
 ## Gap Analysis
 
-### Original Request vs Implementation
+| Gap | Proposed Solution | Status |
+|-----|-------------------|--------|
+| No validation | Zod + JSON schemas | ✅ Done |
+| Generic errors | Structured errors + retry | ✅ Done |
+| No resource hints | Metadata per tool | ✅ Done |
+| No pagination | Pagination builders | ✅ Done |
+| No tool grouping | Tool categorization | ✅ Done |
+| No caching hints | Cacheability + invalidation | ✅ Done |
+| Weak schemas | Zod type safety | ✅ Done (examples deferred) |
+| No rate limiting | Per-tool + server-side throttle | ✅ Done |
 
-| Gap | Proposed Solution | Implemented | Variant |
-|-----|-------------------|-------------|---------|
-| No validation | Zod + JSON schemas | ✅ Yes | Enhanced with error types |
-| Generic errors | Structured errors + retry | ✅ Yes | Includes guidance strings |
-| No resource hints | Metadata per tool | ✅ Yes | Includes 6 categories |
-| No pagination | Pagination builders | ⏳ Deferred | Metadata guides usage |
-| No tool grouping | Tool categorization | ✅ Yes | Plus dependency resolver |
-| No caching hints | Cacheability metadata | ✅ Yes | Functional caching via lru-cache |
-| Weak schemas | Zod type safety | ✅ Yes | With JSON schema export |
-| No rate limiting | Metadata + guidance | ✅ Yes | Enforced via p-queue per-tool limiter |
-
-**Summary:** 6/8 gaps fully closed; 1 partially addressed; 1 deferred with rationale.
+**Summary:** 7/8 gaps fully closed; 1 partially addressed (schema examples deferred to Phase 3).
 
 ---
 
-## Known Limitations & Workarounds
+## Remaining Limitations
 
-### 1. Pagination Not Enforced
-**Limitation:** Large result sets (e.g., `get_spending_summary`) can exceed token budget.
-
-**Workaround:** 
-```javascript
-// Check size first
-const meta = getResourceHint('get_spending_summary');
-if (meta.resultSize === 'large') {
-  // Add filters or split query
-}
-```
-
-**Roadmap:** Phase 2 pagination builder will automate this.
-
----
-
-### 2. Rate Limiting
-**Status:** Now enforced at the tool level via `src/rate-limiter.js` using `p-queue` for per-tool concurrency control.
-
-**Previous limitation:** Metadata indicated limits but server didn't throttle.
-
-**Current state:** Per-tool rate limiting is functional. Operator-configurable limits from resource metadata are respected at runtime.
-
----
-
-### 3. Schema Examples Not Auto-Generated
-**Limitation:** OpenAPI spec lacks per-field examples for discoverability.
-
-**Workaround:**
-```javascript
-// Use Zod schema with descriptions
-account: z.object({
-  name: z.string().describe('Account name (e.g., "Savings")'),
-  type: z.enum(['asset']).describe('Use "asset" for savings accounts'),
-})
-```
-
-**Roadmap:** Examples in v3.2 if needed.
-
----
-
-### 4. No Streaming Support
-**Limitation:** Large responses returned as single JSON blob.
-
-**Workaround:** Use pagination builder (Phase 2) or request filtering.
-
-**Roadmap:** Phase 2 + Phase 3 (streaming via SSE or chunked responses).
-
----
-
-## What's NOT in Scope
-
-### Design Decisions (by choice)
-
-✖️ **Client-side caching** — Claude handles this; server now provides functional response caching via lru-cache  
-✖️ **GraphQL layer** — Would over-engineer; REST is sufficient  
-✖️ **Database connection pooling** — Axios handles HTTP pooling  
-✖️ **Observability hooks** — Use external APM (e.g., Sentry, DataDog)  
-✖️ **API versioning** — Not needed yet; MCP is stable  
-
----
-
-## Phase 2 Roadmap (Planned)
-
-### Priority 1: Pagination Builders
-- [x] PHP API: cursor pagination on transaction endpoints (`?cursor=`)
-- [x] PHP API: Spatie QueryBuilder on Account/Budget (`?filter[]`, `?sort=`)
-- [ ] MCP server: wire tool handlers to pass pagination params
-- [ ] MCP server: implement cursor + offset builders
-- [ ] Add streaming support
-- [ ] Test with large datasets
-
-### Priority 2: Rate Limiting Middleware
-- [x] MCP server: per-tool rate limiting via `src/rate-limiter.js` (p-queue)
-- [x] MCP server: configurable per-tool limits (from resource metadata)
-- [x] PHP API: 3-tier rate limiting (120/60/20 per min) via Laravel RateLimiter
-- [x] PHP API: Laravel's `throttle` middleware automatically emits `X-RateLimit-*` and `Retry-After` headers
-- [ ] Metrics export
-
-### Priority 3: Response Caching & Invalidation
-- [x] MCP server: response caching via `src/response-cache.js` (lru-cache)
-- [x] PHP API: Redis default cache driver with tag-based invalidation (`TaggableCache`)
-- [x] PHP API: domain-specific tags (`config`, `preferences`, `exchange_rates`, `user:{id}`)
-- [ ] MCP server: design invalidation rules per tool category
-- [ ] Webhook support for manual invalidation
-- [ ] Cache warming for critical tools
-
-### Priority 4: Enhanced Examples
-- [ ] Add per-field examples to schemas
-- [ ] Interactive OpenAPI documentation
-- [ ] Use case tutorials (Claude + Firefly)
+| Limitation | Workaround | Phase 3 |
+|------------|------------|---------|
+| Schema examples not auto-generated | Zod `.describe()` provides inline docs | Enhanced examples planned |
+| No streaming support | Pagination reduces payload per request | NDJSON streaming planned |
+| Rate limiting single-instance only | Deploy behind API gateway | Redis-backed limiter planned |
+| Metadata coverage 12/66 tools | Uncatalogued tools get defaults (30/min, no cache) | Expand coverage |
 
 ---
 
 ## Testing Status
 
-### Unit Tests
-**Runner:** vitest (`npm test` / `vitest run`) — 4 tests passing
+**Runner:** vitest (`npm test`)
 
 - ✅ Validation layer (Zod)
 - ✅ Error wrapping (FireflyError)
-- ⏳ Metadata functions (in progress)
-
-### Integration Tests
-- ⏳ Full MCP server (with mock Firefly)
-- ⏳ REST API endpoints
-- ⏳ OpenAPI spec generation
-
-### E2E Tests
-- ⏳ With real Firefly instance
-- ⏳ Claude integration tests
-
-**Note:** Jest has been replaced by vitest. The `test:enhanced` script has been removed; use `npm test` for all test runs.
+- ✅ Pagination helpers (`src/pagination.test.js`)
+- ⏳ Integration tests (mock Firefly) — not started
+- ⏳ E2E tests (real Firefly instance) — not started
 
 ---
 
@@ -389,56 +264,40 @@ account: z.object({
 - [x] Documentation complete
 - [x] Error handling comprehensive
 - [x] Resource metadata accurate
-- [x] Unit tests passing (4 tests, vitest)
-- [ ] Integration tests passing (TODO)
+- [x] Unit tests passing (vitest)
+- [x] Pagination wired into all list tools
+- [x] Rate limiting enforced (client + server)
+- [x] Cache invalidation on writes
+- [ ] Integration tests (TODO)
 - [ ] Performance benchmarks (TODO)
 
 ---
 
-## Migration Path
+## Open Items
 
-### For Existing Users
-1. Keep using `index.js` (unchanged)
-2. Optional: Upgrade to `index.enhanced.js` for Claude support
-3. No breaking changes or downtime
+See [`BACKLOG.md`](../BACKLOG.md) for full details.
 
-### For New Claude Projects
-1. Use `index.enhanced.js` from the start
-2. Leverage metadata + error handling
-3. Reference `CLAUDE_INTEGRATION.md`
+| ID | Priority | Title | Status |
+|----|----------|-------|--------|
+| #23 | P1 | `upload_attachment` wrong API pattern (multipart) | Deferred |
+| #29 | P2 | No `additionalProperties: false` in schemas | ✅ Done |
+| #38 | P2 | Add Pino structured logging | Open |
+| #35 | P3 | Replace Express with Hono/`node:http` | Open |
 
----
-
-## Questions & Next Steps
-
-### Open Items
-1. ~~**Should we enforce rate limits?**~~ → ✅ Yes. PHP API enforces 3-tier rate limiting (120/60/20 per min). MCP server has client-side p-queue limiting.
-2. **Streaming support needed?** → Likely Phase 3; feedback from Claude usage will inform
-3. ~~**Cache invalidation strategy?**~~ → ✅ PHP API uses Redis with tag-based invalidation. MCP server uses TTL-based lru-cache. Per-category rules still planned.
-
-### How to Contribute
-1. Open issues with feature requests
-2. Test with real Claude projects
-3. Provide feedback on pagination/streaming needs
-4. Report any validation edge cases
+See [`KNOWN_GAPS.md`](./KNOWN_GAPS.md) for Phase 3 planned work.
 
 ---
 
-## Summary
+## Document Control
 
-**Status:** Phase 1 complete. Server is Claude-ready with:
-- ✅ Runtime validation
-- ✅ Structured errors with retry guidance
-- ✅ Resource metadata for token-aware planning
-- ✅ Tool organization & discovery
-- ✅ Comprehensive documentation
-
-**Next Phase:** Pagination builders, rate limiting metrics export, cache invalidation rules (subject to user feedback). Rate limiting and response caching are now functional.
-
-**Quality:** Phase 1 P0 and P1 issues resolved (see BACKLOG.md). Two items deferred: #23 (upload_attachment multipart) and #29 (additionalProperties). PHP API now provides cursor pagination, Spatie QueryBuilder, Redis cache tags, and 3-tier rate limiting (April 2026). No remaining blocking issues.
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-04-02 | Initial implementation status |
+| 1.1 | 2026-04-03 | Phase 2 rate limiting and caching updates |
+| 1.2 | 2026-04-05 | PHP API features (cursor pagination, QueryBuilder, Redis tags, rate limiting) |
+| 2.0 | 2026-04-05 | Phase 2 complete. Pagination, rate limiting, cache invalidation all implemented. Condensed stale sections |
 
 ---
 
-**Document Version:** 1.3  
 **Last Updated:** April 5, 2026  
 **Maintained By:** Claude Code

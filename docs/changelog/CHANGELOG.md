@@ -7,7 +7,7 @@ All completed work for mcp-server-firefly-iii, organized by phase and category.
 
 ---
 
-## Phase 2 — Transport-Level Resilience (2026-04-03)
+## Phase 2 — Transport-Level Resilience (2026-04-03 to 2026-04-05)
 
 ### Features
 
@@ -17,13 +17,37 @@ All completed work for mcp-server-firefly-iii, organized by phase and category.
 | #36 | LRU response caching via lru-cache | `8cc877c` | `src/response-cache.js` |
 | #39 | Automatic retry via p-retry | `8cc877c`, `2ba5c8b` | `src/retry.js` |
 | #37 | Replace Jest with Vitest | `2ba5c8b` | `package.json` |
+| — | Cursor/offset pagination module | `a623b3a` | `src/pagination.js`, `src/tools/*.js`, `src/validation.js` |
+| — | Per-category cache invalidation rules | `8cc877c` | `src/response-cache.js` |
 
-**Details:**
+### Pagination (Gap #1 — Resolved)
 
-- **Rate Limiter** (`src/rate-limiter.js`, 31 lines): Sliding-window enforcement using p-queue. One queue per rate tier (10, 20, 30, 60/min) for memory efficiency. Default 30/min for uncatalogued tools. Wired into MCP handlers and REST routes.
-- **Response Cache** (`src/response-cache.js`, 98 lines): LRU cache with max 500 entries. Per-tool TTLs from `resourceMetadata.cacheMaxAge`. Mutations bypass cache. Deterministic cache keys from tool name + sorted args.
-- **Retry** (`src/retry.js`, 66 lines): p-retry with max 3 attempts, exponential backoff (1s minimum). Retries on 408/429/5xx and network errors (ECONNREFUSED, ENOTFOUND, ETIMEDOUT, ECONNRESET). Respects `Retry-After` headers.
-- **Vitest**: Replaced Jest as test runner. 4 tests passing. Removed broken `test:enhanced` script.
+`src/pagination.js`: `buildPaginationParams()` converts `limit`/`offset`/`cursor` args into Firefly API query params. `extractPaginationMeta()` normalizes both cursor-based and offset-based response formats into `{ has_more, next_cursor, prev_cursor }`.
+
+Wired into all 6 list tool categories: accounts, bills, budgets, insights, recurring, transactions. `validators.listParams` updated with optional `limit`/`offset` and new `cursor` field.
+
+**PHP API side:** Cursor pagination on transaction endpoints (`?cursor=`), Spatie QueryBuilder on account/budget endpoints (`?filter[]=`, `?sort=`). Implemented in parent repo commits `ffab0183ed`, `bc7e1cd3f1`.
+
+### Rate Limiting (Gap #2 — Resolved)
+
+**MCP server (client-side):** Per-tool fixed-window token bucket via p-queue (`src/rate-limiter.js`). Exponential backoff retry on 429/5xx/network errors (`src/retry.js`).
+
+**PHP API (server-side):** 3-tier Laravel throttle middleware: `api-read` (120/min), `api-write` (60/min), `api-analytics` (20/min). Configurable via `API_RATE_LIMIT_*` env vars. Implemented in parent repo commit `3a818d1b78`.
+
+**Remaining limitation:** Single-instance only; distributed (Redis) rate limiting tracked as Phase 3.
+
+### Cache Invalidation (Gap #3 — Resolved)
+
+**MCP server:** `WRITE_INVALIDATES` map in `src/response-cache.js` defines per-category rules. Write operations (create/update/delete) automatically flush related read caches. Coverage: accounts, transactions, budgets, budget limits.
+
+**PHP API:** Redis cache with tag-based invalidation via `TaggableCache` helper. Tags: `config`, `preferences`, `exchange_rates`, `user:{id}`. Implemented in parent repo commit `eebd710b82`.
+
+### Infrastructure Details
+
+- **Rate Limiter** (`src/rate-limiter.js`): Fixed-window enforcement using p-queue `intervalCap`. One queue per rate tier (10, 20, 30, 60/min) for memory efficiency. Default 30/min for uncatalogued tools. Wired into MCP handlers and REST routes.
+- **Response Cache** (`src/response-cache.js`): LRU cache with max 500 entries. Per-tool TTLs from `resourceMetadata.cacheMaxAge`. Mutations bypass cache. Deterministic cache keys from tool name + sorted args. Per-category write invalidation via `WRITE_INVALIDATES` map.
+- **Retry** (`src/retry.js`): p-retry with max 3 attempts, exponential backoff (1s minimum). Retries on 408/429/5xx and network errors (ECONNREFUSED, ENOTFOUND, ETIMEDOUT, ECONNRESET). Respects `Retry-After` headers.
+- **Vitest**: Replaced Jest as test runner. Removed broken `test:enhanced` script. Run `npm test` for current test count.
 
 **Dependency changes:**
 - Added: `lru-cache ^11.2.7`, `p-queue ^6.6.2`, `p-retry ^4.6.2`, `better-sse ^0.16.1`, `vitest ^4.1.2`
@@ -188,7 +212,7 @@ Only `id` and `description` were documented as updatable. Expanded to include al
 | `77d504e` | Complete system mastery documentation |
 | `802797e` | Add SECURITY.md |
 
-66 tools with full CRUD coverage: accounts, transactions, budgets, piggy banks, bills, recurring transactions, rules, rule groups, webhooks, attachments, categories, tags, currencies, object groups, data export, system preferences.
+Upstream v3.0.0 claimed 66 tools; audited count is 38 tool groups with 12 having full metadata (see Phase 1 fix #5). Full CRUD coverage across: accounts, transactions, budgets, piggy banks, bills, recurring transactions, rules, rule groups, webhooks, attachments, categories, tags, currencies, object groups, data export, system preferences.
 
 ---
 
@@ -197,16 +221,17 @@ Only `id` and `description` were documented as updatable. Expanded to include al
 | ID | Priority | Title | Status |
 |----|----------|-------|--------|
 | #23 | P1 | upload_attachment wrong API pattern (multipart) | Deferred |
-| #29 | P2 | No `additionalProperties: false` in schemas | Deferred |
+| #29 | P2 | No `additionalProperties: false` in schemas | ✅ Done |
 | #35 | P3 | Replace Express with Hono/node:http | Open |
 | #38 | P2 | Add Pino structured logging | Open |
 
-### Phase 2 Remaining (Planned)
-- Pagination builders for large result sets
-- Per-category cache invalidation rules (mutation-triggered)
+### Phase 3 Planned
+- Distributed rate limiting (Redis-backed)
+- NDJSON streaming for large responses
 - Enhanced schema examples + OpenAPI interactive docs
 - Observability: OTEL integration, health checks, Prometheus metrics
-- Rate limit HTTP response headers (X-RateLimit-*)
+- Request/response compression (gzip/brotli)
+- Optional GraphQL query layer
 
 ---
 

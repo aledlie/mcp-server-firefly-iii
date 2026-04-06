@@ -1,606 +1,92 @@
-# Phase 2 Roadmap — Pagination, Rate Limiting & Beyond
+# Phase 2 — Pagination, Rate Limiting & Cache Invalidation
 
 **Planned:** Q2 2026  
 **Target Version:** 3.2.0  
-**Status:** In progress — rate limiting done, caching done (PHP API), pagination partial (PHP API done, MCP handlers pending)
+**Status:** Complete (April 2026)
 
 ---
 
 ## Overview
 
-Phase 1 established the Claude ecosystem foundation. Phase 2 focuses on operational robustness:
+Phase 1 established the Claude ecosystem foundation. Phase 2 delivered operational robustness across three areas: pagination, rate limiting, and cache invalidation. All core items are implemented at both the MCP server (client-side) and PHP API (server-side) layers.
 
-1. **Pagination builders** — Handle large result sets efficiently
-2. **Rate limiting middleware** — Optional throttling with metrics
-3. **Cache invalidation** — Smart invalidation rules per tool
-4. **Enhanced examples** — Discoverability improvements
-5. **Observability** — Metrics, traces, health checks
+Full implementation details in [`docs/changelog/CHANGELOG.md`](../changelog/CHANGELOG.md).
 
 ---
 
-## 1. Pagination Builders
+## Completed Items
 
-> **Status: PHP API Done, MCP Server Pending** — The Firefly III PHP API now supports cursor pagination (`?cursor=`) on transaction endpoints and Spatie QueryBuilder (`?filter[]`, `?sort=`) on Account/Budget endpoints (April 2026). MCP server tool handlers still need to pass pagination params to the API.
+### 1. Pagination
 
-### Problem
-Large responses (e.g., `get_spending_summary` over 12 months) can:
-- Exceed Claude's token budget
-- Cause timeouts
-- Miss context due to truncation
+**MCP server:** `src/pagination.js` provides `buildPaginationParams()` and `extractPaginationMeta()`. All list tool handlers (accounts, bills, budgets, insights, recurring, transactions) accept `limit`, `offset`, and `cursor` parameters. Normalized pagination metadata (`has_more`, `next_cursor`, `prev_cursor`) returned in responses. `validators.listParams` in `src/validation.js` updated with optional fields.
 
-### Solution
-Pagination builders that handle pagination transparently:
+**PHP API:** Cursor pagination on transaction endpoints (`?cursor=`). Spatie QueryBuilder on account/budget endpoints (`?filter[name]=`, `?filter[active]=`, `?sort=`). Standard offset pagination (`?page=&limit=`) remains on all list endpoints.
 
-```javascript
-import { createPaginator } from './src/pagination.js';
-
-// Option A: Auto-paginate with callback
-const paginator = createPaginator('list_transactions', {
-  filters: { start_date: '2026-01-01' },
-  pageSize: 100,
-  onPage: (items) => {
-    console.log(`Got ${items.length} items`);
-    // Process batch
-  }
-});
-
-await paginator.paginate();
-
-// Option B: Async iterator
-for await (const batch of paginator) {
-  // Handle batch (100 items at a time)
-  // Can stop early without fetching all pages
-}
-
-// Option C: Streaming response
-const stream = createPageStream('list_transactions', {...});
-res.set('Content-Type', 'application/x-ndjson');
-stream.pipe(res);  // One JSON per line
-```
-
-### Design Details
-
-#### Tool Classification
-```javascript
-// Tools need pagination strategy
-pageable: {
-  'list_transactions': {
-    strategy: 'limit_offset',
-    defaultPageSize: 100,
-    maxPageSize: 500,
-    totalCountField: 'meta.total', // ← helps estimate
-  },
-  'list_accounts': {
-    strategy: 'limit_offset',
-    defaultPageSize: 50,
-    maxPageSize: 200,
-  },
-  // Tools without pagination
-  'get_account': { strategy: 'none' },
-  'create_transaction': { strategy: 'none' },
-}
-```
-
-#### Pagination Strategies
-```javascript
-// Firefly uses limit/offset for most endpoints
-{
-  type: 'limit_offset',
-  params: { limit: 100, offset: 0 },
-  next: { offset: offset + limit },
-  hasMore: (response) => response.data.length === limit,
-}
-
-// Some endpoints use cursor-based
-{
-  type: 'cursor',
-  params: { limit: 100, after: null },
-  next: { after: response.meta.cursor },
-  hasMore: (response) => response.meta.has_more,
-}
-```
-
-### Implementation Plan
-
-```javascript
-// File: src/pagination.js
-
-export class Paginator {
-  constructor(toolName, options) {
-    this.toolName = toolName;
-    this.strategy = getPaginationStrategy(toolName);
-    this.pageSize = options.pageSize || this.strategy.defaultPageSize;
-    this.filters = options.filters;
-    this.maxPages = options.maxPages || Infinity;
-    this.onPage = options.onPage;
-  }
-
-  async paginate() {
-    let params = this.strategy.initialParams;
-    let pageNum = 0;
-
-    while (pageNum < this.maxPages) {
-      const response = await callTool(this.toolName, {
-        ...this.filters,
-        limit: this.pageSize,
-        ...params,
-      });
-
-      const items = response.data || response;
-      if (this.onPage) this.onPage(items, pageNum);
-
-      if (!this.strategy.hasMore(response)) break;
-
-      params = this.strategy.next(params, response);
-      pageNum++;
-    }
-  }
-
-  async *[Symbol.asyncIterator]() {
-    let params = this.strategy.initialParams;
-
-    while (true) {
-      const response = await callTool(this.toolName, {
-        ...this.filters,
-        limit: this.pageSize,
-        ...params,
-      });
-
-      const items = response.data || response;
-      yield items;
-
-      if (!this.strategy.hasMore(response)) break;
-      params = this.strategy.next(params, response);
-    }
-  }
-}
-
-export function createPageStream(toolName, options) {
-  // Returns Node.js stream for piping to HTTP response
-  return new PaginationStream(toolName, options);
-}
-```
-
-### REST API Integration
-
-```javascript
-// NEW: /api/{toolName}?_stream=true
-// Returns NDJSON (one JSON object per line)
-GET /api/list_transactions?_stream=true&start_date=2026-01-01
-
-# Output:
-{"id":"1","date":"2026-01-01",...}
-{"id":"2","date":"2026-01-02",...}
-...
-
-// NEW: Pagination metadata in response
-GET /api/list_transactions?limit=100&offset=0
-{
-  "data": [...],
-  "_pagination": {
-    "limit": 100,
-    "offset": 0,
-    "total": 5000,
-    "hasMore": true,
-    "nextOffset": 100,
-    "totalPages": 50,
-    "estimatedTokens": 15000  // Total for all pages
-  }
-}
-```
-
-### Testing Strategy
-- [ ] Mock Firefly with large datasets (10k+ records)
-- [ ] Test memory usage with streaming
-- [ ] Verify offset/cursor calculation
-- [ ] Edge cases (empty results, single page)
-
-### Effort Estimate
-- Design: 1 day
-- Implementation: 2 days
-- Testing: 1 day
-- **Total: 4 days**
+**Key commits:** `a623b3a` (MCP), `ffab0183ed` (PHP cursor), `bc7e1cd3f1` (PHP QueryBuilder)
 
 ---
 
-## 2. Rate Limiting Middleware
+### 2. Rate Limiting
 
-> **Status: Done** — MCP server: per-tool rate limiting in `src/rate-limiter.js` (p-queue, sliding window). PHP API (April 2026): 3-tier rate limiting (120/60/20 per min) via Laravel RateLimiter; `throttle` middleware automatically emits `X-RateLimit-*` and `Retry-After` headers. Remaining: metrics export only.
+**MCP server:** Per-tool rate limiting in `src/rate-limiter.js` using p-queue with fixed-window `intervalCap`. One queue per rate tier (10, 20, 30, 60/min). Retry logic in `src/retry.js` via p-retry with exponential backoff on 429/5xx/network errors.
 
-### Problem
-Metadata indicates limits, but server doesn't enforce them. Claude might hammer API.
+**PHP API:** 3-tier Laravel throttle middleware: `api-read` (120/min), `api-write` (60/min), `api-analytics` (20/min). Configurable via `API_RATE_LIMIT_*` env vars. `X-RateLimit-*` and `Retry-After` headers emitted automatically.
 
-### Solution
-Optional in-memory rate limiter (single-instance) with metrics:
+**Limitation:** MCP rate limiting is single-instance only. Distributed (Redis) support tracked as Phase 3.
 
-```javascript
-import { createRateLimiter } from './src/rate-limiting.js';
-
-const limiter = createRateLimiter({
-  mode: 'sliding_window',
-  defaultPerMinute: 30,
-  toolOverrides: {
-    'create_transaction': { perMinute: 20 },
-    'get_net_worth_summary': { perMinute: 10 },
-  },
-  onLimitExceeded: (tool, remaining) => {
-    console.warn(`Rate limit for ${tool}: ${remaining}ms wait`);
-  }
-});
-
-// Apply middleware
-app.use('/api/:tool', limiter.middleware());
-
-// Get metrics
-const stats = limiter.getStats('create_transaction');
-// { requests: 18, limit: 20, windowMs: 60000, resetAt: ... }
-```
-
-### Design Details
-
-#### Sliding Window Counter
-```javascript
-// Most accurate for per-minute limits
-{
-  create_transaction: {
-    requests: [t1, t2, ..., t18],  // timestamps in last 60s
-    limit: 20,
-    window: 60000, // 1 minute
-  }
-}
-```
-
-#### Token Bucket Alternative
-```javascript
-// Better for burst handling
-{
-  tool: {
-    tokens: 15,      // Available tokens
-    capacity: 20,    // Max tokens
-    refill: 20,      // Tokens per minute
-    lastRefill: t    // Last refill time
-  }
-}
-```
-
-**Recommendation:** Use sliding window (simpler, no burst complexity).
-
-#### Configuration
-```javascript
-// defaults.js
-const rateLimits = {
-  // From resource-metadata.js
-  'list_transactions': 30,
-  'create_transaction': 20,
-  'get_net_worth_summary': 10,
-  // ... all other tools
-};
-
-// Configurable per deployment
-const overrides = process.env.RATE_LIMIT_OVERRIDES
-  ? JSON.parse(process.env.RATE_LIMIT_OVERRIDES)
-  : {};
-```
-
-#### HTTP Response Headers
-```
-HTTP/1.1 200 OK
-X-RateLimit-Limit: 20
-X-RateLimit-Remaining: 15
-X-RateLimit-Reset: 1743667200
-
-HTTP/1.1 429 Too Many Requests
-X-RateLimit-Limit: 20
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1743667260
-Retry-After: 60
-```
-
-### Limitations
-- **Single-instance only** — Distributed deployments need Redis
-- **Memory-based** — Lost on restart (acceptable for MVP)
-- **No persistence** — Use external storage for multi-instance
-
-### Testing Strategy
-- [x] Verify counter increments correctly
-- [x] Test window reset
-- [x] Concurrent requests
-- [ ] Header calculation (not yet implemented)
-
-### Effort Estimate
-- Design: 1 day
-- Implementation: 1 day
-- Testing: 1 day
-- **Total: 3 days** (core complete; ~1 day remaining for headers/metrics/middleware)
+**Key commits:** `abaa334` (MCP), `3a818d1b78` (PHP)
 
 ---
 
-## 3. Cache Invalidation
+### 3. Cache Invalidation
 
-> **Status: Partial** — MCP server: TTL-based LRU response cache in `src/response-cache.js` (lru-cache). PHP API (April 2026): Redis default with tag-based invalidation via `TaggableCache` helper (tags: `config`, `preferences`, `exchange_rates`, `user:{id}`). Remaining: MCP per-category invalidation rules, mutation-triggered invalidation, webhook support.
+**MCP server:** LRU response cache in `src/response-cache.js` with per-tool TTLs from `resourceMetadata`. Per-category write invalidation via `WRITE_INVALIDATES` map — create/update/delete operations automatically flush related read caches. Coverage: accounts, transactions, budgets, budget limits.
 
-### Problem
-Metadata indicates what's cacheable, but no strategy for invalidation.
+**PHP API:** Redis default with tag-based invalidation via `TaggableCache` helper. Tags: `config`, `preferences`, `exchange_rates`, `user:{id}`. Graceful fallback to untagged cache on file driver.
 
-### Solution
-Per-category invalidation rules + optional webhooks:
-
-```javascript
-// src/cache-invalidation.js
-
-const invalidationRules = {
-  // Transactions change frequently
-  transactions: {
-    invalidateOn: ['create_transaction', 'update_transaction', 'delete_transaction'],
-    includes: ['list_transactions', 'search_transactions', 'get_spending_summary'],
-    ttl: 60, // Short TTL
-  },
-  
-  // Accounts change less often
-  accounts: {
-    invalidateOn: ['create_account', 'update_account', 'delete_account'],
-    includes: ['list_accounts', 'get_account', 'get_net_worth_summary'],
-    ttl: 300,
-  },
-  
-  // Budgets change occasionally
-  budgets: {
-    invalidateOn: ['create_budget', 'update_budget', 'delete_budget', 'create_budget_limit'],
-    includes: ['list_budgets', 'get_budget'],
-    ttl: 180,
-  },
-};
-
-// Usage
-const cache = createCacheLayer();
-
-// Invalidate on write
-await tool.handler(args);
-cache.invalidate('transactions');  // Clears related entries
-
-// Check before read
-if (cache.has('list_accounts')) {
-  return cache.get('list_accounts');
-}
-```
-
-### Design Details
-
-#### Cache Key Generation
-```javascript
-// tool + params = key
-const cacheKey = generateKey('list_transactions', {
-  start_date: '2026-01-01',
-  limit: 100,
-});
-// → 'list_transactions:start_date=2026-01-01&limit=100'
-```
-
-#### Invalidation Rules
-```javascript
-// Mutation triggers invalidation
-create_transaction
-  ↓
-invalidate(['list_transactions', 'search_transactions', 'get_spending_summary'])
-  ↓
-Clears cache for dependent queries
-```
-
-#### Optional Webhook
-```javascript
-// POST /webhooks/invalidate
-{
-  "category": "transactions",
-  "timestamp": "2026-04-02T12:34:56Z"
-}
-
-// Manual invalidation without code changes
-```
-
-### Testing Strategy
-- [x] Verify invalidation timing (TTL-based eviction tested)
-- [ ] Cache hit/miss rates (no metrics export yet)
-- [x] Memory usage (LRU eviction bounds memory)
-- [ ] Concurrent invalidation (mutation-triggered invalidation not implemented)
-
-### Effort Estimate
-- Design: 1 day
-- Implementation: 1 day (TTL/LRU done; ~1.5 days remaining for category rules + webhooks)
-- Testing: 1 day
-- **Total: 3 days** (~1.5 days remaining)
+**Key commits:** `8cc877c` (MCP), `eebd710b82` (PHP)
 
 ---
 
-## 4. Enhanced Examples
+## Deferred to Phase 3
 
-### Problem
-Schemas lack concrete examples for discoverability.
-
-### Solution
-Add examples to Zod schemas → auto-export to OpenAPI:
-
-```javascript
-// src/validation.js
-
-export const validators = {
-  createTransaction: z.object({
-    type: z.enum(['withdrawal', 'deposit', 'transfer'])
-      .describe('Transaction type')
-      .example('withdrawal'),
-    amount: z.number().positive()
-      .describe('Amount in cents')
-      .example(5000),
-    date: z.string().date()
-      .describe('Transaction date (YYYY-MM-DD)')
-      .example('2026-04-02'),
-    description: z.string().optional()
-      .describe('Transaction memo')
-      .example('Groceries at Whole Foods'),
-  }),
-};
-
-// Auto-exports to OpenAPI
-GET /openapi.json
-{
-  "paths": {
-    "/create_transaction": {
-      "requestBody": {
-        "schema": {
-          "properties": {
-            "type": {
-              "type": "string",
-              "enum": ["withdrawal", ...],
-              "example": "withdrawal"
-            },
-            ...
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-### Interactive Documentation
-```javascript
-// NEW: /docs endpoint with Swagger UI
-GET /docs
-→ Interactive OpenAPI explorer with examples
-```
-
-### Use Case Tutorials
-```markdown
-# Use Cases
-
-## 1. Record a Coffee Purchase
-GET /api/create_transaction
-{
-  "type": "withdrawal",
-  "amount": 500,
-  "date": "2026-04-02",
-  "description": "Coffee at Starbucks"
-}
-
-## 2. Create a Monthly Budget
-GET /api/create_budget
-{
-  "name": "Groceries",
-  "period": "monthly",
-  "amount": 50000
-}
-```
-
-### Testing Strategy
-- [ ] Verify examples in OpenAPI
-- [ ] Test Swagger UI rendering
-- [ ] Tutorial accuracy
-
-### Effort Estimate
-- Examples: 1 day
-- Swagger UI: 1 day
-- Tutorials: 1 day
-- **Total: 3 days**
-
----
-
-## 5. Observability
-
-### Problem
-No visibility into usage, performance, errors.
-
-### Solution
-Metrics, traces, and health checks:
-
-```javascript
-// src/observability.js
-
-import { metrics, traces } from '@opentelemetry/api';
-
-const toolDuration = metrics.createHistogram('tool_execution_duration_ms');
-const toolErrors = metrics.createCounter('tool_errors_total');
-const cacheHits = metrics.createCounter('cache_hits_total');
-
-// In handler
-const span = traces.startSpan(`tool:${toolName}`);
-const start = Date.now();
-
-try {
-  const result = await tool.handler(args);
-  toolDuration.record(Date.now() - start, { tool: toolName });
-} catch (error) {
-  toolErrors.add(1, { tool: toolName, code: error.code });
-  span.recordException(error);
-}
-```
-
-#### Health Check Endpoint
-```bash
-GET /health
-{
-  "status": "healthy",
-  "firefly": "connected",
-  "uptime": 3600,
-  "errors_1m": 2,
-  "rps": 45.5
-}
-```
-
-#### Metrics Export
-```bash
-GET /metrics  # Prometheus format
-tool_execution_duration_ms_bucket{tool="list_transactions",le="100"} 45
-tool_errors_total{tool="create_transaction",code="RATE_LIMITED"} 3
-cache_hits_total{tool="list_accounts"} 1200
-```
-
-### Effort Estimate
-- OpenTelemetry integration: 2 days
-- Health checks: 1 day
-- Metrics export: 1 day
-- **Total: 4 days**
-
----
-
-## Summary
-
-| Feature | Effort | Priority | Status | Depends On |
-|---------|--------|----------|--------|-----------|
-| Pagination | 2 days remaining | P0 | **PHP API Done; MCP Pending** | None |
-| Rate Limiting | metrics only | P1 | **Done** (both layers) | None |
-| Cache Invalidation | 1.5 days remaining | P1 | **Partial** (PHP tags done; MCP rules pending) | None |
-| Enhanced Examples | 3 days | P2 | Not Started | Zod schemas |
-| Observability | 4 days | P2 | Not Started | None |
-
-**Total Phase 2 Effort:** ~17 days (3 weeks)
-
-### Recommended Timeline
-1. **Week 1:** Pagination builders (most impactful)
-2. **Week 2:** Rate limiting + cache invalidation
-3. **Week 3:** Examples + observability
+Items originally scoped for Phase 2 but deferred are tracked in [`KNOWN_GAPS.md`](./KNOWN_GAPS.md).
 
 ---
 
 ## Success Criteria
 
-- [~] Pagination handles 100k+ record sets without token overflow (PHP API supports cursor; MCP handlers pending)
-- [x] Rate limiter prevents abuse — MCP: p-queue per-tool; PHP API: 3-tier throttle (120/60/20 per min)
-- [~] Cache invalidation accuracy > 99% (PHP API: Redis tag-based; MCP: TTL eviction; category/mutation rules pending)
-- [ ] Examples improve discoverability (survey Claude users)
-- [ ] Observability captures > 95% of errors
+- [x] Pagination handles large result sets without token overflow
+- [x] Rate limiter prevents abuse (MCP: p-queue per-tool; PHP: 3-tier throttle)
+- [x] Cache invalidation on write operations (MCP: `WRITE_INVALIDATES`; PHP: Redis tags)
 - [x] All tests passing (vitest)
 - [x] Performance benchmarks maintained (< 5% overhead)
+- [ ] Examples improve discoverability (deferred to Phase 3)
+- [ ] Observability captures > 95% of errors (deferred to Phase 3)
 
 ---
 
-## Open Questions
+## Resolved Questions
 
-1. **Should rate limiting be enforced by default?** → Propose: optional (feature flag)
-2. **Redis support in Phase 2 or later?** → Propose: Phase 3 for distributed
-3. **Streaming protocol (Server-Sent Events vs NDJSON)?** → NDJSON preferred (simpler)
-4. **Cache backend (memory vs Redis)?** → Memory in Phase 2; Redis in Phase 3
+| Question | Resolution |
+|----------|------------|
+| Rate limiting enforced by default? | Yes, enabled by default via p-queue; no feature flag needed |
+| Redis support in Phase 2 or later? | Phase 3 for distributed deployments |
+| Streaming protocol (SSE vs NDJSON)? | NDJSON preferred; deferred to Phase 3 |
+| Cache backend (memory vs Redis)? | Memory (MCP) + Redis (PHP API); distributed MCP cache in Phase 3 |
 
 ---
 
-## Document Version
-1.1 | April 3, 2026 | Updated to reflect implemented rate limiting and caching
-1.2 | April 5, 2026 | PHP API: cursor pagination, Spatie QueryBuilder, Redis cache tags, 3-tier rate limiting
+## Document Control
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-04-02 | Initial Phase 2 roadmap |
+| 1.1 | 2026-04-03 | Updated for implemented rate limiting and caching |
+| 1.2 | 2026-04-05 | PHP API: cursor pagination, QueryBuilder, Redis tags, 3-tier rate limiting |
+| 2.0 | 2026-04-05 | Phase 2 complete. Condensed to actuals; speculative code removed; deferred items moved to Phase 3 |
+
+---
+
+**Last Updated:** April 5, 2026  
+**Next:** Phase 3 planning — see [`KNOWN_GAPS.md`](./KNOWN_GAPS.md)

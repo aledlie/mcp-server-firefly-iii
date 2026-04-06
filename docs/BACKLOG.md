@@ -12,9 +12,9 @@
 |----------|-------|------|----------|------|
 | P0 | 11 | 11 | 0 | 0 |
 | P1 | 9 | 8 | 1 | 0 |
-| P2 | 15 | 13 | 1 | 1 |
+| P2 | 15 | 14 | 0 | 1 |
 | P3 | 8 | 7 | 0 | 1 |
-| **Total** | **43** | **39** | **2** | **2** |
+| **Total** | **43** | **40** | **1** | **2** |
 
 ---
 
@@ -90,25 +90,11 @@ Tool likely passes base64 content as JSON. Firefly III requires binary multipart
 
 ---
 
-### Issue #29: No `additionalProperties: false` in Tool Schemas
+### Issue #29: No `additionalProperties: false` in Tool Schemas — ✅ Done
 
 **Priority:** P2
 **Source:** Code Review
-
-**Problem:**
-Without `additionalProperties: false`, Claude can pass arbitrary extra fields that are silently forwarded to Firefly API. May trigger unexpected behavior.
-
-**Solution:**
-Add to all `inputSchema` objects:
-```javascript
-const inputSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: { ... },
-};
-```
-
-**Deferred:** Phase 2. Estimated 0.25 day (automated script across all tools).
+**Resolution:** `lockdownSchema()` in `src/tools/registry.js` recursively applies `additionalProperties: false` to all tool schemas at registration time. Covers all 66 tools including nested objects.
 
 ---
 
@@ -117,7 +103,6 @@ const inputSchema = {
 1. **#38** Pino structured logging (45min) -- enables Phase 2 observability
 2. **#35** Replace Express with Hono (1-2hr) -- size optimization only
 3. **#23** upload_attachment multipart (1 day) -- when multipart design is decided
-4. **#29** additionalProperties: false (0.25 day) -- batch apply in Phase 2
 
 ---
 
@@ -129,5 +114,5 @@ const inputSchema = {
 
 **P0 (11):** #1, #2, #3, #4, #15, #16, #17, #18, #19, #20, #21
 **P1 (8):** #5, #6, #7, #8, #22, #24, #25
-**P2 (13):** #9, #10, #11, #12, #26, #27, #28, #32, #33, #36, #37, #39, #40
+**P2 (14):** #9, #10, #11, #12, #26, #27, #28, #29, #32, #33, #36, #37, #39, #40
 **P3 (7):** #13, #14, #30, #31, #34
