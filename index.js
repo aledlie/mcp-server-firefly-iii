@@ -12,6 +12,7 @@ const { FireflyError, toMCPErrorResult, wrapFireflyError } = require("./src/erro
 const { rateLimited } = require("./src/rate-limiter.js");
 const responseCache = require("./src/response-cache.js");
 const { withRetry } = require("./src/retry.js");
+const logger = require("./src/logger.js");
 
 // Import tool registry (no side effects — no Server instantiation)
 const { TOOLS } = require('./src/tools/registry.js');
@@ -122,17 +123,17 @@ async function runServer() {
     });
 
     app.listen(PORT, () => {
-      console.error(`Universal AI Bridge running at http://localhost:${PORT}`);
+      logger.info({ port: PORT }, 'Universal AI Bridge listening');
     });
   } else {
     const transport = new StdioServerTransport();
     await mcpServer.connect(transport);
-    console.error("Firefly III MCP Server running on stdio");
+    logger.info("Firefly III MCP Server running on stdio");
   }
 }
 
 if (require.main === module) {
-  runServer().catch(console.error);
+  runServer().catch((err) => { logger.fatal(err, 'server failed to start'); process.exit(1); });
 }
 
 module.exports = { mcpServer, TOOLS, apiClient };

@@ -1,15 +1,16 @@
 const axios = require("axios");
 require("dotenv").config();
+const logger = require("./logger.js");
 
 // Configuration
 const FIREFLY_URL = process.env.FIREFLY_URL;
 const FIREFLY_TOKEN = process.env.FIREFLY_TOKEN;
-const PORT = process.env.PORT; 
+const PORT = process.env.PORT;
 
 if (!FIREFLY_URL || !FIREFLY_TOKEN) {
   // If we are in test mode, we bypass the error
   if (process.env.NODE_ENV !== "test") {
-    console.error("Error: FIREFLY_URL and FIREFLY_TOKEN are required.");
+    logger.fatal("FIREFLY_URL and FIREFLY_TOKEN are required");
     process.exit(1);
   }
 }
@@ -24,12 +25,9 @@ const apiClient = axios.create({
   },
 });
 
-// Debug interceptor — only active when DEBUG=true or NODE_ENV=development
-// Never log params (may contain credentials)
+// Debug interceptor — never log params (may contain credentials)
 apiClient.interceptors.request.use(config => {
-  if (process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development') {
-    console.error(`[API] ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
-  }
+  logger.debug({ method: config.method.toUpperCase(), url: `${config.baseURL}${config.url}` }, 'api request');
   return config;
 });
 

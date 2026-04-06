@@ -37,6 +37,7 @@ const {
 const { rateLimited } = require('./src/rate-limiter.js');
 const responseCache = require('./src/response-cache.js');
 const { withRetry } = require('./src/retry.js');
+const logger = require('./src/logger.js');
 
 // Import tool registry (no side effects — no Server instantiation)
 const { TOOLS } = require('./src/tools/registry.js');
@@ -50,7 +51,7 @@ function enrichToolMetadata(tool) {
   const category = getToolCategory(tool.name);
 
   if (!resourceHint) {
-    console.warn(`[enrichToolMetadata] No metadata registered for tool: ${tool.name} (Phase 2 incomplete)`);
+    logger.warn({ tool: tool.name }, 'no metadata registered (Phase 2 incomplete)');
   }
 
   return {
@@ -91,15 +92,11 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const tool = enrichedTools.find((t) => t.name === request.params.name);
 
   if (!tool) {
-    const error = {
-      isError: true,
-      code: 'TOOL_NOT_FOUND',
-      message: `Tool not found: ${request.params.name}`,
-      availableTools: enrichedTools.map((t) => t.name),
-    };
-    return {
-      content: [{ type: 'text', text: JSON.stringify(error, null, 2) }],
-    };
+    return toMCPErrorResult(new FireflyError(
+      'TOOL_NOT_FOUND',
+      `Tool not found: ${request.params.name}`,
+      { availableTools: enrichedTools.map((t) => t.name) }
+    ));
   }
 
   try {
@@ -296,20 +293,19 @@ async function runServer() {
     });
 
     app.listen(PORT, () => {
-      console.error(`Firefly III MCP Server (Claude-Enhanced) running at http://localhost:${PORT}`);
-      console.error(`OpenAPI: http://localhost:${PORT}/openapi.json`);
-      console.error(`Metadata: http://localhost:${PORT}/tools/metadata`);
+      logger.info({ port: PORT }, 'Firefly III MCP Server (Claude-Enhanced) listening');
+      logger.info({ openapi: `http://localhost:${PORT}/openapi.json`, metadata: `http://localhost:${PORT}/tools/metadata` }, 'endpoints');
     });
   } else {
     const transport = new StdioServerTransport();
     await mcpServer.connect(transport);
-    console.error('Firefly III MCP Server running on stdio');
+    logger.info('Firefly III MCP Server running on stdio');
   }
 }
 
 // Start server
 if (require.main === module) {
-  runServer().catch(console.error);
+  runServer().catch((err) => { logger.fatal(err, 'server failed to start'); process.exit(1); });
 }
 
 module.exports = { mcpServer, enrichedTools: enrichedTools, TOOLS: enrichedTools, apiClient };

@@ -1,4 +1,5 @@
 const { LRUCache } = require('lru-cache');
+const logger = require('./logger.js');
 
 /**
  * Resource metadata and hints for Claude ecosystem
@@ -190,7 +191,7 @@ function estimateTokenCost(toolName, inputArgs = {}, resultSize = 'default') {
     // Tool has no metadata entry — 54 of 66 tools are not yet catalogued (Phase 2)
     // Warn only once per tool to avoid console spam on repeated calls
     if (!warnedMissingMetadata.has(toolName)) {
-      console.warn(`[resource-metadata] No token estimate for tool: ${toolName} (Phase 2)`);
+      logger.warn({ tool: toolName }, 'no token estimate (Phase 2)');
       warnedMissingMetadata.set(toolName, true);
     }
     return 0;
