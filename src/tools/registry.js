@@ -17,6 +17,28 @@ const groupsTools = require('./groups.js');
 const recurringTools = require('./recurring.js');
 const adminTools = require('./admin.js');
 
+/**
+ * Recursively sets additionalProperties: false on all object-type schemas.
+ * Prevents unexpected fields from being silently forwarded to the Firefly API.
+ * See BACKLOG.md #29.
+ */
+function lockdownSchema(schema) {
+  if (!schema || typeof schema !== 'object') return schema;
+
+  if (schema.type === 'object' && schema.properties) {
+    schema.additionalProperties = false;
+    for (const prop of Object.values(schema.properties)) {
+      lockdownSchema(prop);
+    }
+  }
+
+  if (schema.items) {
+    lockdownSchema(schema.items);
+  }
+
+  return schema;
+}
+
 const TOOLS = [
   ...coreTools,
   ...accountsTools,
@@ -30,6 +52,9 @@ const TOOLS = [
   ...groupsTools,
   ...recurringTools,
   ...adminTools,
-];
+].map((tool) => ({
+  ...tool,
+  inputSchema: lockdownSchema({ ...tool.inputSchema }),
+}));
 
 module.exports = { TOOLS };
