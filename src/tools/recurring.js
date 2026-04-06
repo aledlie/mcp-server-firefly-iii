@@ -1,11 +1,26 @@
 const { apiClient } = require("../config.js");
+const { buildPaginationParams, extractPaginationMeta } = require("../pagination.js");
+
+const PAGINATION_PROPERTIES = {
+  limit: { type: "number", description: "Max results (default: 50)" },
+  offset: { type: "number", description: "Pagination offset" },
+  cursor: { type: "string", description: "Cursor from previous response for cursor-based pagination" },
+};
 
 const recurringTools = [
   {
     name: "list_recurring",
     description: "List all recurring transaction rules.",
-    inputSchema: { type: "object", properties: {} },
-    handler: async () => (await apiClient.get("/recurring")).data
+    inputSchema: {
+      type: "object",
+      properties: { ...PAGINATION_PROPERTIES },
+    },
+    handler: async (args) => {
+      const params = buildPaginationParams(args);
+      const response = (await apiClient.get("/recurring", { params })).data;
+      const pagination = extractPaginationMeta(response);
+      return pagination ? { ...response, _pagination: pagination } : response;
+    }
   },
   {
     name: "get_recurring",

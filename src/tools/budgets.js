@@ -1,11 +1,26 @@
 const { apiClient } = require("../config.js");
+const { buildPaginationParams, extractPaginationMeta } = require("../pagination.js");
+
+const PAGINATION_PROPERTIES = {
+  limit: { type: "number", description: "Max results (default: 50)" },
+  offset: { type: "number", description: "Pagination offset" },
+  cursor: { type: "string", description: "Cursor from previous response for cursor-based pagination" },
+};
 
 const budgetsTools = [
   {
     name: "list_budgets",
     description: "List all budgets.",
-    inputSchema: { type: "object", properties: {} },
-    handler: async () => (await apiClient.get("/budgets")).data
+    inputSchema: {
+      type: "object",
+      properties: { ...PAGINATION_PROPERTIES },
+    },
+    handler: async (args) => {
+      const params = buildPaginationParams(args);
+      const response = (await apiClient.get("/budgets", { params })).data;
+      const pagination = extractPaginationMeta(response);
+      return pagination ? { ...response, _pagination: pagination } : response;
+    }
   },
   {
     name: "get_budget",
@@ -44,8 +59,20 @@ const budgetsTools = [
   {
     name: "list_budget_limits",
     description: "List monetary limits for a budget.",
-    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
-    handler: async (args) => (await apiClient.get(`/budgets/${args.id}/limits`)).data
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        ...PAGINATION_PROPERTIES,
+      },
+      required: ["id"],
+    },
+    handler: async (args) => {
+      const params = buildPaginationParams(args);
+      const response = (await apiClient.get(`/budgets/${args.id}/limits`, { params })).data;
+      const pagination = extractPaginationMeta(response);
+      return pagination ? { ...response, _pagination: pagination } : response;
+    }
   },
   {
     name: "create_budget_limit",

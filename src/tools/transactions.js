@@ -1,11 +1,26 @@
 const { apiClient } = require("../config.js");
+const { buildPaginationParams, extractPaginationMeta } = require("../pagination.js");
+
+const PAGINATION_PROPERTIES = {
+  limit: { type: "number", description: "Max results (default: 50)" },
+  offset: { type: "number", description: "Pagination offset" },
+  cursor: { type: "string", description: "Cursor from previous response for cursor-based pagination" },
+};
 
 const transactionsTools = [
   {
     name: "list_transactions",
     description: "List recent transactions.",
-    inputSchema: { type: "object", properties: { limit: { type: "number", description: "Max results (default: 10)" } } },
-    handler: async (args) => (await apiClient.get("/transactions", { params: { limit: args.limit || 10 } })).data
+    inputSchema: {
+      type: "object",
+      properties: { ...PAGINATION_PROPERTIES },
+    },
+    handler: async (args) => {
+      const params = buildPaginationParams(args);
+      const response = (await apiClient.get("/transactions", { params })).data;
+      const pagination = extractPaginationMeta(response);
+      return pagination ? { ...response, _pagination: pagination } : response;
+    }
   },
   {
     name: "get_transaction",
@@ -111,10 +126,18 @@ const transactionsTools = [
     description: "Search for transactions.",
     inputSchema: {
       type: "object",
-      properties: { query: { type: "string" }, limit: { type: "number", description: "Max results (default: 10)" } },
+      properties: {
+        query: { type: "string" },
+        ...PAGINATION_PROPERTIES,
+      },
       required: ["query"]
     },
-    handler: async (args) => (await apiClient.get("/search/transactions", { params: { query: args.query, limit: args.limit || 10 } })).data
+    handler: async (args) => {
+      const params = { query: args.query, ...buildPaginationParams(args) };
+      const response = (await apiClient.get("/search/transactions", { params })).data;
+      const pagination = extractPaginationMeta(response);
+      return pagination ? { ...response, _pagination: pagination } : response;
+    }
   }
 ];
 

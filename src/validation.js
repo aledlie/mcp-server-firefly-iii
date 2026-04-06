@@ -78,8 +78,9 @@ const toMCPSchema = (zodSchema) => {
  */
 const validators = {
   listParams: z.object({
-    limit: z.number().int().positive().max(500).default(50).describe('Max results to return'),
-    offset: z.number().int().nonnegative().default(0).describe('Pagination offset'),
+    limit: z.number().int().positive().max(500).optional().describe('Max results to return (default: 50)'),
+    offset: z.number().int().nonnegative().optional().describe('Pagination offset'),
+    cursor: z.string().optional().describe('Cursor for cursor-based pagination (from previous response)'),
   }),
 
   dateRange: z.object({

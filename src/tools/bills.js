@@ -1,11 +1,26 @@
 const { apiClient } = require("../config.js");
+const { buildPaginationParams, extractPaginationMeta } = require("../pagination.js");
+
+const PAGINATION_PROPERTIES = {
+  limit: { type: "number", description: "Max results (default: 50)" },
+  offset: { type: "number", description: "Pagination offset" },
+  cursor: { type: "string", description: "Cursor from previous response for cursor-based pagination" },
+};
 
 const billsTools = [
   {
     name: "list_bills",
     description: "List all bills.",
-    inputSchema: { type: "object", properties: {} },
-    handler: async () => (await apiClient.get("/bills")).data
+    inputSchema: {
+      type: "object",
+      properties: { ...PAGINATION_PROPERTIES },
+    },
+    handler: async (args) => {
+      const params = buildPaginationParams(args);
+      const response = (await apiClient.get("/bills", { params })).data;
+      const pagination = extractPaginationMeta(response);
+      return pagination ? { ...response, _pagination: pagination } : response;
+    }
   },
   {
     name: "create_bill",
@@ -35,8 +50,16 @@ const billsTools = [
   {
     name: "list_piggy_banks",
     description: "List all piggy banks.",
-    inputSchema: { type: "object", properties: {} },
-    handler: async () => (await apiClient.get("/piggy-banks")).data
+    inputSchema: {
+      type: "object",
+      properties: { ...PAGINATION_PROPERTIES },
+    },
+    handler: async (args) => {
+      const params = buildPaginationParams(args);
+      const response = (await apiClient.get("/piggy-banks", { params })).data;
+      const pagination = extractPaginationMeta(response);
+      return pagination ? { ...response, _pagination: pagination } : response;
+    }
   },
   {
     name: "create_piggy_bank",

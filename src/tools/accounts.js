@@ -1,11 +1,29 @@
 const { apiClient } = require("../config.js");
+const { buildPaginationParams, extractPaginationMeta } = require("../pagination.js");
+
+const PAGINATION_PROPERTIES = {
+  limit: { type: "number", description: "Max results (default: 50)" },
+  offset: { type: "number", description: "Pagination offset" },
+  cursor: { type: "string", description: "Cursor from previous response for cursor-based pagination" },
+};
 
 const accountsTools = [
   {
     name: "list_accounts",
     description: "List all accounts.",
-    inputSchema: { type: "object", properties: { type: { type: "string", enum: ["asset", "expense", "revenue", "liabilities"] } } },
-    handler: async (args) => (await apiClient.get("/accounts", { params: { type: args.type || "asset" } })).data
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["asset", "expense", "revenue", "liabilities"] },
+        ...PAGINATION_PROPERTIES,
+      },
+    },
+    handler: async (args) => {
+      const params = { type: args.type || "asset", ...buildPaginationParams(args) };
+      const response = (await apiClient.get("/accounts", { params })).data;
+      const pagination = extractPaginationMeta(response);
+      return pagination ? { ...response, _pagination: pagination } : response;
+    }
   },
   {
     name: "get_account",
