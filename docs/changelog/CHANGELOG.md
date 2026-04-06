@@ -157,7 +157,7 @@ All docs showed `import` syntax after CJS conversion. Replaced with `require()` 
 Referenced non-existent `src/test-loader.js`. Script removed from `package.json`.
 
 **#12 — Silent zero token estimates**
-`estimateTokenCost()` returned 0 with no warning for uncatalogued tools. Added warn-once tracking using a `Set` — logs warning once per tool per session.
+`estimateTokenCost()` returned 0 with no warning for uncatalogued tools. Added warn-once tracking using a bounded `LRUCache` (max 200 entries) — logs warning once per tool per session.
 
 **#27 — Unenforced schema defaults**
 `default: 10` in JSON schemas was ignored by MCP SDK. Removed `default` from schemas; defaults applied in handler logic (`args.limit ?? 10`). Documentation updated.
@@ -223,7 +223,7 @@ Upstream v3.0.0 claimed 66 tools; audited count is 38 tool groups with 12 having
 | #23 | P1 | upload_attachment wrong API pattern (multipart) | Deferred |
 | #29 | P2 | No `additionalProperties: false` in schemas | ✅ Done |
 | #35 | P3 | Replace Express with Hono/node:http | Open |
-| #38 | P2 | Add Pino structured logging | Open |
+| #38 | P2 | Add Pino structured logging | ✅ Done |
 
 ### Phase 3 Planned
 - Distributed rate limiting (Redis-backed)

@@ -2,7 +2,7 @@
 
 **Report Date:** April 3, 2026  
 **Version:** 3.0.0  
-**Status:** Phase 1 Complete, Phase 2 Complete
+**Status:** Phase 1 Complete, Phase 2 Complete (pagination, rate limiting, cache invalidation)
 
 ---
 
@@ -281,7 +281,7 @@ See [`BACKLOG.md`](../BACKLOG.md) for full details.
 |----|----------|-------|--------|
 | #23 | P1 | `upload_attachment` wrong API pattern (multipart) | Deferred |
 | #29 | P2 | No `additionalProperties: false` in schemas | ✅ Done |
-| #38 | P2 | Add Pino structured logging | Open |
+| #38 | P2 | Add Pino structured logging | ✅ Done |
 | #35 | P3 | Replace Express with Hono/`node:http` | Open |
 
 See [`KNOWN_GAPS.md`](./KNOWN_GAPS.md) for Phase 3 planned work.
