@@ -194,11 +194,21 @@ Only `id` and `description` were documented as updatable. Expanded to include al
 | Documentation suite | `4c6c933` | `CLAUDE_INTEGRATION.md`, `ENHANCEMENTS.md`, roadmap docs |
 | Zod + schema deps | `3dfa885` | `package.json` |
 
-**Validation** (`src/validation.js`): Zod-powered runtime validation with auto JSON schema generation. Pre-built validators for transactions, accounts, budgets, dates, pagination.
+### Feature Details
 
-**Error Handling** (`src/errors.js`): `FireflyError` class with error codes (RATE_LIMITED, TIMEOUT, NOT_FOUND, etc.), `toMCPErrorResult()` for MCP-compliant responses, sensitive data redaction, axios error interceptor.
+**1. Input Validation** (`src/validation.js`): Zod-powered runtime validation with auto JSON schema generation. Pre-built validators: `listParams`, `dateRange`, `createTransaction`, `account`, `budget`. Includes field-level error messages and type coercion (string → enum).
 
-**Resource Metadata** (`src/resource-metadata.js`): Per-tool metadata for 12 core tools (token estimates, cacheability, rate limit hints). Tool categorization into 6 groups (38 tools). Dependency resolver with topological sort. Token cost estimator.
+**2. Error Handling** (`src/errors.js`): `FireflyError` class with error codes (`AUTHENTICATION_FAILED` 403/401, `RATE_LIMITED` 429, `TIMEOUT`, `NOT_FOUND` 404, `VALIDATION_FAILED` 422, `SERVER_ERROR` 500+, `CONNECTION_FAILED`, `DNS_ERROR`, `UNKNOWN_ERROR`). `toMCPErrorResult()` for MCP-compliant responses. Automatic retryability detection, suggested retry delays, sensitive data redaction.
+
+**3. Resource Metadata** (`src/resource-metadata.js`): Per-tool metadata for 12 core tools (token estimates, cacheability, rate limit hints, dependency graph). 66 total tools; 38 organized into 6 categories in `toolGroups`. Metadata coverage: 12/66 (18%) — remaining tools return null from `getResourceHint()` and 0 from `estimateTokenCost()`. Caching and rate limiting now functional via `src/response-cache.js` and `src/rate-limiter.js`.
+
+**4. Tool Organization** (`src/resource-metadata.js` + `index.enhanced.js`): 6 categories — transactions (7), accounts (5), budgets (8), analytics (3), automation (10), system (5). Functions: `getToolsByCategory()`, `getToolCategory()`, `resolveDependencies()`.
+
+**5. Claude Documentation**: `CLAUDE_INTEGRATION.md` (usage patterns), `ENHANCEMENTS.md` (technical architecture), `README_CLAUDE.md` (quick reference). Covers integration guide, error handling patterns, resource metadata usage, best practices, performance tuning, troubleshooting.
+
+**6. Retry & Backoff** (`src/errors.js` + `src/retry.js`): p-retry with exponential backoff. Error classification with retryability detection and suggested delays: `RATE_LIMITED` 5000ms, `TIMEOUT` 3000ms, `NETWORK` 10000ms.
+
+**7. Enhanced Schemas** (`src/validation.js`, partial): Type safety via Zod, auto JSON schema generation, field descriptions, enum/min/max constraints, required fields. Missing: per-field examples, pattern constraints (deferred to Phase 3).
 
 **Enhanced Server** (`index.enhanced.js`): REST API with `/tools/metadata`, `/tools/resolve-dependencies`, `/openapi.json`, `/api/{toolName}`. SSE support with session-keyed routing.
 
@@ -213,6 +223,27 @@ Only `id` and `description` were documented as updatable. Expanded to include al
 | `802797e` | Add SECURITY.md |
 
 Upstream v3.0.0 claimed 66 tools; audited count is 38 tool groups with 12 having full metadata (see Phase 1 fix #5). Full CRUD coverage across: accounts, transactions, budgets, piggy banks, bills, recurring transactions, rules, rule groups, webhooks, attachments, categories, tags, currencies, object groups, data export, system preferences.
+
+---
+
+## Remaining Limitations
+
+| Limitation | Workaround | Phase 3 |
+|------------|------------|---------|
+| Schema examples not auto-generated | Zod `.describe()` provides inline docs | Enhanced examples planned |
+| No streaming support | Pagination reduces payload per request | NDJSON streaming planned |
+| Rate limiting single-instance only | Deploy behind API gateway | Redis-backed limiter planned |
+| Metadata coverage 12/66 tools | Uncatalogued tools get defaults (30/min, no cache) | Expand coverage |
+
+## Testing Status
+
+**Runner:** vitest (`npm test`)
+
+- ✅ Validation layer (Zod)
+- ✅ Error wrapping (FireflyError)
+- ✅ Pagination helpers (`src/pagination.test.js`)
+- ⏳ Integration tests (mock Firefly) — not started
+- ⏳ E2E tests (real Firefly instance) — not started
 
 ---
 
@@ -236,4 +267,4 @@ Upstream v3.0.0 claimed 66 tools; audited count is 38 tool groups with 12 having
 ---
 
 **Maintained by:** Claude Code
-**Source:** Consolidated from BACKLOG.md, IMPLEMENTATION_STATUS.md, KNOWN_GAPS.md, PHASE_2_ROADMAP.md
+**Source:** Consolidated from BACKLOG.md, KNOWN_GAPS.md, PHASE_2_ROADMAP.md
